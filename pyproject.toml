@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "chilean-judicial-ai"
+version = "0.1.0"
+description = "Sistema autónomo de simulación procesal chilena"
+authors = ["Your Name <your.email@example.com>"]
+
+packages = [{include = "src"}]
+[tool.poetry.dependencies]
+python = "^3.9"
+langchain = "^0.3.18"
+chromadb = "^0.5.0"
+rich = "^13.7.1"
+pydantic = "^2.7.1"
+python-dotenv = "^1.0.1"
+langchain-community = "^0.3.17"
+requests = "^2.32.3"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
