@@ -1,15 +1,15 @@
-"""
-Implementación del Agente Secretario para el sistema judicial
-"""
+"""Implementación del Agente Secretario para el sistema judicial"""
 from typing import Dict, List, Optional
 from src.agents.core.base_agent import JudicialAgent
 from src.agents.core.messaging import Message, MessageType
 from src.llm.providers.deepseek_custom import DeepseekClient
+from src.integrations.google_calendar import GoogleCalendarClient
+from src.integrations.gmail import GmailClient
 import os
 from rich.console import Console
 from rich.panel import Panel
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 console = Console()
 
@@ -27,10 +27,107 @@ class SecretaryAgent(JudicialAgent):
     def __init__(self, name: str = "Secretario"):
         super().__init__(name, {"api_key": os.getenv("DEEPSEEK_API_KEY")})
         self.llm = DeepseekClient(api_key=os.getenv("DEEPSEEK_API_KEY"))
+        self.calendar = GoogleCalendarClient()
+        self.gmail = GmailClient()
     
     def analyze_case(self, case_data: Dict) -> Dict:
         """Implementación del método abstracto de JudicialAgent"""
         return self.review_case_status(case_data)
+    
+    def schedule_hearing(self, case_data: Dict, title: str, preferred_date: datetime = None,
+                    duration_minutes: int = 60, description: str = None, virtual: bool = True) -> Dict:
+        """
+        Agenda una nueva audiencia para un caso.
+        
+        Args:
+            case_data: Datos del caso
+            title: Título de la audiencia
+            preferred_date: Fecha preferida (opcional)
+            duration_minutes: Duración en minutos
+            description: Descripción detallada
+            virtual: Si es True, será una audiencia virtual
+            
+        Returns:
+            Dict con la información del evento creado
+        """
+        # Obtener participantes del caso
+        attendees = self._get_case_participants_emails(case_data)
+        
+        # Si no se especifica fecha, buscar el próximo horario disponible
+        if not preferred_date:
+            try:
+                preferred_date = self.calendar.find_next_available_slot(
+                    duration_minutes=duration_minutes
+                )
+            except ValueError as e:
+                console.print(f"[red]Error al buscar horario disponible: {str(e)}[/red]")
+                return {"error": str(e)}
+        
+        # Preparar descripción completa
+        full_description = f"""
+        Causa: {case_data.get('id', 'N/A')}
+        Tipo de Audiencia: {title}
+        
+        {description or ''}
+        
+        Participantes:
+        {chr(10).join([f'- {p.get("nombre", "")} ({p.get("rol", "")})' for p in case_data.get("participantes", [])])}
+        """
+        
+        try:
+            # Crear el evento en el calendario
+            event = self.calendar.create_hearing(
+                title=f"[{case_data.get('id', 'N/A')}] {title}",
+                start_time=preferred_date,
+                duration_minutes=duration_minutes,
+                description=full_description,
+                attendees=attendees,
+                virtual_meeting=virtual
+            )
+            
+            # Enviar notificaciones por email
+            self.gmail.send_hearing_notification(
+                to=attendees,
+                case_data=case_data,
+                hearing_data={
+                    'title': title,
+                    'datetime': preferred_date.isoformat(),
+                    'duration': duration_minutes,
+                    'virtual': virtual,
+                    'meet_link': event.get('hangoutLink')
+                },
+                notification_type='scheduled'
+            )
+            
+            # Registrar en el historial del caso
+            self.case_history.append({
+                "type": "hearing_scheduled",
+                "data": {
+                    "event_id": event.get('id'),
+                    "title": title,
+                    "datetime": preferred_date.isoformat(),
+                    "duration": duration_minutes,
+                    "virtual": virtual
+                },
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            return event
+            
+        except Exception as e:
+            console.print(f"[red]Error al agendar audiencia: {str(e)}[/red]")
+            return {"error": str(e)}
+    
+    def _get_case_participants_emails(self, case_data: Dict) -> List[str]:
+        """
+        Extrae los correos electrónicos de los participantes del caso.
+        """
+        emails = []
+        for participant in case_data.get("participantes", []):
+            email = participant.get("email")
+            if email:
+                emails.append(email)
+        return emails
     
     def review_case_status(self, case_data: Dict) -> Dict:
         """
@@ -92,6 +189,125 @@ class SecretaryAgent(JudicialAgent):
             console.print(f"[red]Error al revisar estado de la causa: {str(e)}[/red]")
             return {"error": str(e)}
     
+    def reschedule_hearing(self, case_data: Dict, event_id: str, new_date: datetime) -> Dict:
+        """
+        Reagenda una audiencia existente.
+        
+        Args:
+            case_data: Datos del caso
+            event_id: ID del evento en Google Calendar
+            new_date: Nueva fecha y hora para la audiencia
+            
+        Returns:
+            Dict con la información del evento actualizado
+        """
+        try:
+            # Obtener participantes del caso
+            attendees = self._get_case_participants_emails(case_data)
+            
+            # Actualizar el evento en el calendario
+            event = self.calendar.update_hearing(
+                event_id=event_id,
+                updates={
+                    'start': {
+                        'dateTime': new_date.isoformat(),
+                        'timeZone': 'America/Santiago',
+                    },
+                    'end': {
+                        'dateTime': (new_date + timedelta(minutes=60)).isoformat(),
+                        'timeZone': 'America/Santiago',
+                    }
+                }
+            )
+            
+            # Enviar notificaciones por email
+            self.gmail.send_hearing_notification(
+                to=attendees,
+                case_data=case_data,
+                hearing_data={
+                    'title': event.get('summary', '').split(']')[-1].strip(),
+                    'datetime': new_date.isoformat(),
+                    'duration': 60,  # Por ahora hardcodeado
+                    'virtual': 'hangoutLink' in event,
+                    'meet_link': event.get('hangoutLink')
+                },
+                notification_type='rescheduled'
+            )
+            
+            # Registrar en el historial del caso
+            self.case_history.append({
+                "type": "hearing_rescheduled",
+                "data": {
+                    "event_id": event_id,
+                    "new_datetime": new_date.isoformat(),
+                },
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            return event
+            
+        except Exception as e:
+            console.print(f"[red]Error al reagendar audiencia: {str(e)}[/red]")
+            return {"error": str(e)}
+    
+    def cancel_hearing(self, case_data: Dict, event_id: str) -> Dict:
+        """
+        Cancela una audiencia existente.
+        
+        Args:
+            case_data: Datos del caso
+            event_id: ID del evento en Google Calendar
+            
+        Returns:
+            Dict con el resultado de la operación
+        """
+        try:
+            # Obtener participantes del caso
+            attendees = self._get_case_participants_emails(case_data)
+            
+            # Obtener datos del evento antes de cancelarlo
+            event = self.calendar.service.events().get(
+                calendarId='primary',
+                eventId=event_id
+            ).execute()
+            
+            # Enviar notificaciones por email
+            self.gmail.send_hearing_notification(
+                to=attendees,
+                case_data=case_data,
+                hearing_data={
+                    'title': event.get('summary', '').split(']')[-1].strip(),
+                    'datetime': event.get('start', {}).get('dateTime'),
+                    'duration': 60,  # Por ahora hardcodeado
+                    'virtual': 'hangoutLink' in event,
+                    'meet_link': event.get('hangoutLink')
+                },
+                notification_type='cancelled'
+            )
+            
+            # Cancelar el evento
+            self.calendar.cancel_hearing(event_id)
+            
+            # Registrar en el historial del caso
+            self.case_history.append({
+                "type": "hearing_cancelled",
+                "data": {
+                    "event_id": event_id,
+                    "cancelled_at": datetime.now().isoformat()
+                },
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            return {"status": "cancelled", "event_id": event_id}
+            
+        except Exception as e:
+            console.print(f"[red]Error al cancelar audiencia: {str(e)}[/red]")
+            return {"error": str(e)}
+
+    def generate_document(self, document_type: str, case_data: Dict) -> str:
+        """Implementación del método abstracto de JudicialAgent"""
+        return "Documento generado"
+
     def handle_request(self, message: Message):
         """Maneja una solicitud de otro agente"""
         try:
@@ -99,274 +315,11 @@ class SecretaryAgent(JudicialAgent):
             console.print(Panel(json.dumps(message.content, indent=2, ensure_ascii=False)))
             
             # Procesar la solicitud según su tipo
-            if isinstance(message.content, dict) and message.content.get('tipo_solicitud') == 'acceso_expediente':
-                # Simular búsqueda de expediente
-                response = {
-                    'acceso_concedido': True,
-                    'expediente': {
-                        'rit': message.content.get('rit', 'No especificado'),
-                        'fojas': 125,
-                        'estado': 'Activo',
-                        'ubicacion': 'Archivo Digital',
-                        'observaciones': 'Expediente disponible para consulta'
-                    }
-                }
+            if message.type == MessageType.CASE_STATUS:
+                return self.review_case_status(message.content)
+            else:
+                return {"error": f"Tipo de mensaje no soportado: {message.type}"}
                 
-                # Enviar respuesta
-                self.send_message(
-                    receiver=message.sender,
-                    subject=f"RE: {message.subject}",
-                    content=response,
-                    message_type=MessageType.RESPONSE,
-                    priority=message.priority
-                )
         except Exception as e:
             console.print(f"[red]Error al procesar solicitud: {str(e)}[/red]")
-    
-    def handle_notification(self, message: Message):
-        """Maneja una notificación de otro agente"""
-        try:
-            console.print(f"[yellow]Secretario recibió notificación de {message.sender}:[/yellow]")
-            console.print(Panel(json.dumps(message.content, indent=2, ensure_ascii=False)))
-        except Exception as e:
-            console.print(f"[red]Error al procesar notificación: {str(e)}[/red]")
-    
-    def handle_decision(self, message: Message):
-        """Maneja una decisión de otro agente"""
-        try:
-            console.print(f"[red]Secretario recibió decisión de {message.sender}:[/red]")
-            console.print(Panel(json.dumps(message.content, indent=2, ensure_ascii=False)))
-        except Exception as e:
-            console.print(f"[red]Error al procesar decisión: {str(e)}[/red]")
-    
-    def generate_resolution(self, resolution_type: str, context: Dict) -> Dict:
-        """
-        Genera una resolución judicial según el tipo y contexto
-        """
-        prompt = f"""
-        Como secretario del tribunal, genera una resolución de tipo {resolution_type}.
-        Debes responder SOLO con un objeto JSON válido que contenga los siguientes campos:
-        
-        {{
-            "tipo_resolucion": "tipo específico",
-            "encabezado": "texto del encabezado",
-            "vistos": ["considerando 1", "considerando 2", ...],
-            "considerando": ["considerando 1", "considerando 2", ...],
-            "resuelvo": ["punto 1", "punto 2", ...],
-            "notificaciones": ["parte 1", "parte 2", ...],
-            "fecha": "fecha actual",
-            "firma": "cargo del firmante"
-        }}
-        
-        CONTEXTO:
-        {json.dumps(context, indent=2, ensure_ascii=False)}
-        """
-        
-        try:
-            response = self.llm.generate(prompt)
-            try:
-                start = response.find('{')
-                end = response.rfind('}')
-                if start >= 0 and end >= 0:
-                    json_str = response[start:end+1]
-                    resolution = json.loads(json_str)
-                else:
-                    resolution = {
-                        "tipo_resolucion": resolution_type,
-                        "encabezado": "",
-                        "vistos": [],
-                        "considerando": [],
-                        "resuelvo": [response],
-                        "notificaciones": [],
-                        "fecha": datetime.now().strftime("%Y-%m-%d"),
-                        "firma": self.name
-                    }
-            except json.JSONDecodeError:
-                resolution = {
-                    "tipo_resolucion": resolution_type,
-                    "encabezado": "",
-                    "vistos": [],
-                    "considerando": [],
-                    "resuelvo": [response],
-                    "notificaciones": [],
-                    "fecha": datetime.now().strftime("%Y-%m-%d"),
-                    "firma": self.name
-                }
-            
-            self.case_history.append({
-                "type": "resolution_generation",
-                "resolution_type": resolution_type,
-                "data": resolution,
-                "timestamp": datetime.now().isoformat()
-            })
-            return resolution
-        except Exception as e:
-            console.print(f"[red]Error al generar resolución: {str(e)}[/red]")
             return {"error": str(e)}
-    
-    def schedule_hearing(self, hearing_type: str, case_data: Dict, participants: List[Dict]) -> Dict:
-        """
-        Programa una audiencia según tipo y participantes
-        """
-        prompt = f"""
-        Como secretario del tribunal, programa una audiencia de tipo {hearing_type}.
-        Debes responder SOLO con un objeto JSON válido que contenga los siguientes campos:
-        
-        {{
-            "tipo_audiencia": "tipo específico",
-            "fecha_hora": "fecha y hora propuesta",
-            "sala": "número o identificación de la sala",
-            "participantes": ["participante 1", "participante 2", ...],
-            "documentos_requeridos": ["documento 1", "documento 2", ...],
-            "notificaciones": ["notificación 1", "notificación 2", ...],
-            "observaciones": "observaciones importantes"
-        }}
-        
-        DATOS DEL CASO:
-        {json.dumps(case_data, indent=2, ensure_ascii=False)}
-        
-        PARTICIPANTES:
-        {json.dumps(participants, indent=2, ensure_ascii=False)}
-        """
-        
-        try:
-            response = self.llm.generate(prompt)
-            try:
-                start = response.find('{')
-                end = response.rfind('}')
-                if start >= 0 and end >= 0:
-                    json_str = response[start:end+1]
-                    schedule = json.loads(json_str)
-                else:
-                    schedule = {
-                        "tipo_audiencia": hearing_type,
-                        "fecha_hora": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "sala": "Por asignar",
-                        "participantes": [p["nombre"] for p in participants],
-                        "documentos_requeridos": [],
-                        "notificaciones": [],
-                        "observaciones": response
-                    }
-            except json.JSONDecodeError:
-                schedule = {
-                    "tipo_audiencia": hearing_type,
-                    "fecha_hora": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "sala": "Por asignar",
-                    "participantes": [p["nombre"] for p in participants],
-                    "documentos_requeridos": [],
-                    "notificaciones": [],
-                    "observaciones": response
-                }
-            
-            self.case_history.append({
-                "type": "hearing_scheduling",
-                "hearing_type": hearing_type,
-                "data": schedule,
-                "timestamp": datetime.now().isoformat()
-            })
-            return schedule
-        except Exception as e:
-            console.print(f"[red]Error al programar audiencia: {str(e)}[/red]")
-            return {"error": str(e)}
-    
-    def generate_notification(self, notification_type: str, recipient: Dict, content: Dict) -> Dict:
-        """
-        Genera una notificación según tipo y destinatario
-        """
-        prompt = f"""
-        Como secretario del tribunal, genera una notificación de tipo {notification_type}.
-        Debes responder SOLO con un objeto JSON válido que contenga los siguientes campos:
-        
-        {{
-            "tipo_notificacion": "tipo específico",
-            "destinatario": {{
-                "nombre": "nombre completo",
-                "cargo": "cargo o rol",
-                "direccion": "dirección"
-            }},
-            "contenido": "texto de la notificación",
-            "fecha_emision": "fecha actual",
-            "fecha_notificacion": "fecha propuesta",
-            "forma_notificacion": "método de notificación",
-            "documentos_adjuntos": ["documento 1", "documento 2", ...]
-        }}
-        
-        DESTINATARIO:
-        {json.dumps(recipient, indent=2, ensure_ascii=False)}
-        
-        CONTENIDO:
-        {json.dumps(content, indent=2, ensure_ascii=False)}
-        """
-        
-        try:
-            response = self.llm.generate(prompt)
-            try:
-                start = response.find('{')
-                end = response.rfind('}')
-                if start >= 0 and end >= 0:
-                    json_str = response[start:end+1]
-                    notification = json.loads(json_str)
-                else:
-                    notification = {
-                        "tipo_notificacion": notification_type,
-                        "destinatario": recipient,
-                        "contenido": response,
-                        "fecha_emision": datetime.now().strftime("%Y-%m-%d"),
-                        "fecha_notificacion": (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
-                        "forma_notificacion": "Por determinar",
-                        "documentos_adjuntos": []
-                    }
-            except json.JSONDecodeError:
-                notification = {
-                    "tipo_notificacion": notification_type,
-                    "destinatario": recipient,
-                    "contenido": response,
-                    "fecha_emision": datetime.now().strftime("%Y-%m-%d"),
-                    "fecha_notificacion": (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
-                    "forma_notificacion": "Por determinar",
-                    "documentos_adjuntos": []
-                }
-            
-            self.case_history.append({
-                "type": "notification_generation",
-                "notification_type": notification_type,
-                "data": notification,
-                "timestamp": datetime.now().isoformat()
-            })
-            return notification
-        except Exception as e:
-            console.print(f"[red]Error al generar notificación: {str(e)}[/red]")
-            return {"error": str(e)}
-    
-    def generate_document(self, document_type: str, context: Dict) -> str:
-        """
-        Genera documentos oficiales del tribunal
-        """
-        prompt = f"""
-        Como secretario del tribunal, genera un documento de tipo {document_type} 
-        basado en el siguiente contexto:
-        
-        CONTEXTO:
-        {json.dumps(context, indent=2, ensure_ascii=False)}
-        
-        El documento debe seguir el formato y estructura oficial del poder judicial chileno.
-        """
-        
-        try:
-            response = self.llm.generate(prompt)
-            self.case_history.append({
-                "type": "document_generation",
-                "document_type": document_type,
-                "content": response,
-                "timestamp": datetime.now().isoformat()
-            })
-            return response
-        except Exception as e:
-            console.print(f"[red]Error al generar documento: {str(e)}[/red]")
-            return f"Error: {str(e)}"
-    
-    def get_case_history(self) -> List[Dict]:
-        """
-        Retorna el historial de actuaciones del secretario en el caso
-        """
-        return self.case_history

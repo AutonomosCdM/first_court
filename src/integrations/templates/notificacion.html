@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #003366;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+        .metadata {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .recipient {
+            margin-bottom: 20px;
+        }
+        .content {
+            margin-bottom: 20px;
+        }
+        .notification {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .footer {
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .signature-area {
+            margin-top: 40px;
+            text-align: right;
+            padding-right: 50px;
+        }
+        .signature-box {
+            display: inline-block;
+            text-align: center;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TRIBUNAL AUTÓNOMO</h1>
+        <h2>NOTIFICACIÓN JUDICIAL</h2>
+    </div>
+
+    <div class="metadata">
+        <p><strong>Causa:</strong> {{case_id}}</p>
+        <p><strong>Fecha:</strong> {{date}}</p>
+        <p><strong>Tipo:</strong> {{notification_type}}</p>
+        <p><strong>Referencia:</strong> {{reference}}</p>
+    </div>
+
+    <div class="recipient">
+        <p><strong>A:</strong></p>
+        <p>{{recipient_name}}</p>
+        <p>{{recipient_role}}</p>
+        <p>{{recipient_email}}</p>
+    </div>
+
+    <div class="content">
+        <p>Por la presente se le notifica que:</p>
+        <div class="notification">
+            {{notification_content}}
+        </div>
+    </div>
+
+    <div class="content">
+        <h3>DOCUMENTOS ADJUNTOS:</h3>
+        <ul>
+        {% for doc in attached_documents %}
+            <li>
+                <p><strong>{{doc.title}}</strong></p>
+                <p>Enlace: {{doc.link}}</p>
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <div class="content">
+        <h3>PLAZOS Y ACCIONES:</h3>
+        {% if deadlines %}
+        <ul>
+        {% for deadline in deadlines %}
+            <li>
+                <p><strong>{{deadline.action}}:</strong> {{deadline.date}}</p>
+            </li>
+        {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+
+    <div class="signature-area">
+        <div class="signature-box">
+            <p>Atentamente,</p>
+            <p><strong>{{secretary_name}}</strong></p>
+            <p>Secretario</p>
+            <p>Tribunal Autónomo</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Esta notificación fue generada automáticamente por el Sistema de Tribunal Autónomo</p>
+        <p>Hash del documento: {{document_hash}}</p>
+        <p>Versión: {{version}}</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #e67e22;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 0 0 5px 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #e67e22;
+            color: white !important;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .info-box {
+            background-color: #fff3e0;
+            padding: 15px;
+            border-left: 4px solid #e67e22;
+            margin: 10px 0;
+        }
+        .date-change {
+            background-color: #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .meet-link {
+            background-color: #34a853;
+            color: white !important;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        .important {
+            color: #d35400;
+            font-weight: bold;
+        }
+        .date-comparison {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+        }
+        .date-box {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+        }
+        .arrow {
+            font-size: 24px;
+            color: #e67e22;
+            margin: 0 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏛️ Sistema Judicial</h1>
+        <h2>⚠️ Cambio de Fecha de Audiencia</h2>
+    </div>
+    
+    <div class="content">
+        <div class="info-box">
+            <h3>📋 Información de la Causa</h3>
+            <p><strong>Número:</strong> {{case_id}}</p>
+            <p><strong>Tipo:</strong> {{case_type}}</p>
+            <p><strong>Materia:</strong> {{case_matter}}</p>
+        </div>
+
+        <div class="date-change">
+            <h3>🔄 Cambio de Fecha</h3>
+            <div class="date-comparison">
+                <div class="date-box">
+                    <h4>Fecha Original</h4>
+                    <p>{{original_date}}</p>
+                    <p>{{original_time}}</p>
+                </div>
+                <div class="arrow">➜</div>
+                <div class="date-box">
+                    <h4>Nueva Fecha</h4>
+                    <p class="important">{{new_date}}</p>
+                    <p class="important">{{new_time}}</p>
+                </div>
+            </div>
+        </div>
+
+        {% if is_virtual %}
+        <div class="info-box">
+            <h3>💻 Acceso Virtual</h3>
+            <p>El enlace de acceso se mantiene:</p>
+            <a href="{{meet_link}}" class="meet-link">
+                🎥 Unirse a la Audiencia Virtual
+            </a>
+        </div>
+        {% endif %}
+
+        <div class="info-box">
+            <h3>👥 Participantes</h3>
+            {% for participant in participants %}
+            <div class="participant">
+                <strong>{{participant.name}}</strong> ({{participant.role}})
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="info-box">
+            <h3>⚠️ Importante</h3>
+            <ul>
+                <li>Su calendario se actualizará automáticamente</li>
+                <li>La duración y demás detalles de la audiencia se mantienen</li>
+                <li>Si no puede asistir en la nueva fecha, por favor notifique a la brevedad</li>
+            </ul>
+        </div>
+
+        <a href="{{calendar_link}}" class="button">
+            📅 Actualizar en Mi Calendario
+        </a>
+    </div>
+    
+    <div class="footer">
+        <p>Este es un mensaje automático del Sistema Judicial. Por favor no responda a este correo.</p>
+        <p>Si tiene alguna duda, contacte a la secretaría del tribunal.</p>
+        <p><small>Las audiencias pueden estar sujetas a cambios. Se notificará oportunamente cualquier modificación.</small></p>
+    </div>
+</body>
+</html>

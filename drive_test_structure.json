@@ -1,0 +1,62 @@
+{
+  "public": {
+    "id": "1Z20ZX0J2O4SfP95M6auVT0WxHKjYRA3G",
+    "name": "1_Documentos_P\u00fablicos",
+    "webViewLink": "https://drive.google.com/drive/folders/1Z20ZX0J2O4SfP95M6auVT0WxHKjYRA3G"
+  },
+  "confidential": {
+    "id": "1U0l4dVUzz3tg1MBkNBLMq4KQl-Gv4a_S",
+    "name": "2_Documentos_Confidenciales",
+    "webViewLink": "https://drive.google.com/drive/folders/1U0l4dVUzz3tg1MBkNBLMq4KQl-Gv4a_S"
+  },
+  "communications": {
+    "id": "1TPTkhgMsE6VNj8pkW2TOLTVcvg08CLcN",
+    "name": "3_Comunicaciones",
+    "webViewLink": "https://drive.google.com/drive/folders/1TPTkhgMsE6VNj8pkW2TOLTVcvg08CLcN"
+  },
+  "public_demanda": {
+    "id": "1JNDMtv1jy4lLdE1v-OJwBByx_HTihgwO",
+    "name": "Demanda",
+    "webViewLink": "https://drive.google.com/drive/folders/1JNDMtv1jy4lLdE1v-OJwBByx_HTihgwO"
+  },
+  "public_contestaciones": {
+    "id": "1nrTq3G-KHkFtvliwH8GakAwrfJiQg0dw",
+    "name": "Contestaciones",
+    "webViewLink": "https://drive.google.com/drive/folders/1nrTq3G-KHkFtvliwH8GakAwrfJiQg0dw"
+  },
+  "public_resoluciones": {
+    "id": "1RepZDyzFJjBZlCiscu6QAyjWeVtX81Jo",
+    "name": "Resoluciones",
+    "webViewLink": "https://drive.google.com/drive/folders/1RepZDyzFJjBZlCiscu6QAyjWeVtX81Jo"
+  },
+  "public_audiencias": {
+    "id": "15AoPLF0evy267NXt3uZ53wI_5BV-__g6",
+    "name": "Audiencias",
+    "webViewLink": "https://drive.google.com/drive/folders/15AoPLF0evy267NXt3uZ53wI_5BV-__g6"
+  },
+  "confidential_juez": {
+    "id": "1erBnDkttNuO7l8QBv5cyCKW2t7-XbrBs",
+    "name": "Juez",
+    "webViewLink": "https://drive.google.com/drive/folders/1erBnDkttNuO7l8QBv5cyCKW2t7-XbrBs"
+  },
+  "confidential_defensor": {
+    "id": "1D3j9lJMLAXTdfUJpwX1e69F3X_lm3mI3",
+    "name": "Defensor",
+    "webViewLink": "https://drive.google.com/drive/folders/1D3j9lJMLAXTdfUJpwX1e69F3X_lm3mI3"
+  },
+  "confidential_secretar\u00eda": {
+    "id": "1TVtHvDsENaZ6x6e1Y10LINLWG-Ex2KrB",
+    "name": "Secretar\u00eda",
+    "webViewLink": "https://drive.google.com/drive/folders/1TVtHvDsENaZ6x6e1Y10LINLWG-Ex2KrB"
+  },
+  "communications_notificaciones": {
+    "id": "14AjS-ERstFOWg7mV5GM4tAIOiYDxzTwl",
+    "name": "Notificaciones",
+    "webViewLink": "https://drive.google.com/drive/folders/14AjS-ERstFOWg7mV5GM4tAIOiYDxzTwl"
+  },
+  "communications_correspondencia": {
+    "id": "1soAcoZDnM4Tnv7T8bvxJnVX98R0zkVIU",
+    "name": "Correspondencia",
+    "webViewLink": "https://drive.google.com/drive/folders/1soAcoZDnM4Tnv7T8bvxJnVX98R0zkVIU"
+  }
+}

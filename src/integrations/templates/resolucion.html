@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #003366;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+        .metadata {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .content {
+            margin-bottom: 20px;
+        }
+        .resolution {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .footer {
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .signature-area {
+            margin-top: 40px;
+            text-align: center;
+        }
+        .signature-box {
+            display: inline-block;
+            text-align: center;
+            width: 200px;
+        }
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TRIBUNAL AUTÓNOMO</h1>
+        <h2>RESOLUCIÓN JUDICIAL</h2>
+    </div>
+
+    <div class="metadata">
+        <p><strong>Causa:</strong> {{case_id}}</p>
+        <p><strong>Fecha:</strong> {{date}}</p>
+        <p><strong>Tipo:</strong> {{resolution_type}}</p>
+        <p><strong>Materia:</strong> {{subject}}</p>
+    </div>
+
+    <div class="content">
+        <h3>VISTOS:</h3>
+        <p>{{vistos}}</p>
+
+        <h3>CONSIDERANDO:</h3>
+        <p>{{considerando}}</p>
+    </div>
+
+    <div class="resolution">
+        <h3>SE RESUELVE:</h3>
+        <p>{{resolucion}}</p>
+    </div>
+
+    <div class="footer">
+        <p>Notifíquese a las partes por el medio correspondiente.</p>
+        <p>Regístrese y archívese en su oportunidad.</p>
+    </div>
+
+    <div class="signature-area">
+        <div class="signature-box">
+            <div class="signature-line"></div>
+            <p><strong>{{judge_name}}</strong></p>
+            <p>Juez Presidente</p>
+            <p>Tribunal Autónomo</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Documento generado automáticamente por el Sistema de Tribunal Autónomo</p>
+        <p>Hash del documento: {{document_hash}}</p>
+        <p>Versión: {{version}}</p>
+    </div>
+</body>
+</html>

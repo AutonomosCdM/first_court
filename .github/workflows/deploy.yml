@@ -1,0 +1,45 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: |
+        yarn install
+        
+    - name: Create environment files
+      run: |
+        # Agents env
+        echo "LANGCHAIN_API_KEY=${{ secrets.LANGCHAIN_API_KEY }}
+        LANGCHAIN_PROJECT=${{ secrets.LANGCHAIN_PROJECT }}
+        LANGCHAIN_TRACING_V2=true
+        
+        # DeepSeek APIs
+        DEEPSEEK_LEGAL_API_KEY=${{ secrets.DEEPSEEK_LEGAL_API_KEY }}
+        DEEPSEEK_DOCS_API_KEY=${{ secrets.DEEPSEEK_DOCS_API_KEY }}
+        DEEPSEEK_ADMIN_API_KEY=${{ secrets.DEEPSEEK_ADMIN_API_KEY }}
+        
+        # Google APIs
+        GOOGLE_APPLICATION_CREDENTIALS=/credentials.json" > open-canvas/apps/agents/.env
+        
+        # Web env
+        echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" > open-canvas/apps/web/.env
+        
+    - name: Build
+      run: yarn build

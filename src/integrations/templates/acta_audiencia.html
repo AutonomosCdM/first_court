@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #003366;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+        .metadata {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .participants {
+            margin-bottom: 20px;
+        }
+        .participant {
+            margin: 5px 0;
+            padding: 5px;
+        }
+        .content {
+            margin-bottom: 20px;
+        }
+        .section {
+            margin-bottom: 15px;
+        }
+        .agreements {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .footer {
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .signature-area {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .signature-box {
+            text-align: center;
+            width: 200px;
+        }
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 50px;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .ai-notes {
+            background-color: #fff3e0;
+            padding: 15px;
+            border-left: 4px solid #ff9800;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TRIBUNAL AUTÓNOMO</h1>
+        <h2>ACTA DE AUDIENCIA</h2>
+    </div>
+
+    <div class="metadata">
+        <h3>INFORMACIÓN DE LA CAUSA</h3>
+        <p><strong>Número de Causa:</strong> {{case_id}}</p>
+        <p><strong>Tipo de Audiencia:</strong> {{hearing_type}}</p>
+        <p><strong>Fecha:</strong> {{date}}</p>
+        <p><strong>Hora Inicio:</strong> {{start_time}}</p>
+        <p><strong>Hora Término:</strong> {{end_time}}</p>
+        <p><strong>Modalidad:</strong> {{modality}}</p>
+        {% if is_virtual %}
+        <p><strong>Enlace de Grabación:</strong> {{recording_link}}</p>
+        {% endif %}
+    </div>
+
+    <div class="participants">
+        <h3>PARTICIPANTES</h3>
+        {% for participant in participants %}
+        <div class="participant">
+            <p><strong>{{participant.role}}:</strong> {{participant.name}}</p>
+            <p><strong>Conectado desde:</strong> {{participant.location}}</p>
+            <p><strong>Hora de ingreso:</strong> {{participant.join_time}}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="content">
+        <h3>DESARROLLO DE LA AUDIENCIA</h3>
+        {% for section in sections %}
+        <div class="section">
+            <h4>{{section.title}}</h4>
+            <p>{{section.content}}</p>
+            {% if section.timestamp %}
+            <p class="timestamp">{{section.timestamp}}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="agreements">
+        <h3>ACUERDOS Y RESOLUCIONES</h3>
+        <ul>
+        {% for agreement in agreements %}
+            <li>
+                <p><strong>{{agreement.title}}</strong></p>
+                <p>{{agreement.content}}</p>
+                {% if agreement.deadline %}
+                <p><em>Plazo: {{agreement.deadline}}</em></p>
+                {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <div class="ai-notes">
+        <h3>NOTAS DEL SECRETARIO AI</h3>
+        <ul>
+        {% for note in ai_notes %}
+            <li>
+                <p><strong>{{note.type}}:</strong> {{note.content}}</p>
+                {% if note.action_required %}
+                <p><em>Acción requerida: {{note.action_required}}</em></p>
+                {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <div class="signature-area">
+        {% for signature in signatures %}
+        <div class="signature-box">
+            <div class="signature-line"></div>
+            <p><strong>{{signature.name}}</strong></p>
+            <p>{{signature.role}}</p>
+            {% if signature.timestamp %}
+            <p class="timestamp">Firmado: {{signature.timestamp}}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="footer">
+        <p>Documento generado automáticamente por el Sistema de Tribunal Autónomo</p>
+        <p>Hash del documento: {{document_hash}}</p>
+        <p>Versión: {{version}}</p>
+    </div>
+</body>
+</html>

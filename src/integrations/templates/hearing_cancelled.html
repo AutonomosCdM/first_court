@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #e74c3c;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 0 0 5px 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .info-box {
+            background-color: #fde9e8;
+            padding: 15px;
+            border-left: 4px solid #e74c3c;
+            margin: 10px 0;
+        }
+        .cancelled-notice {
+            background-color: #e74c3c;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-size: 1.2em;
+        }
+        .important {
+            color: #c0392b;
+            font-weight: bold;
+        }
+        .next-steps {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏛️ Sistema Judicial</h1>
+        <h2>❌ Cancelación de Audiencia</h2>
+    </div>
+    
+    <div class="content">
+        <div class="cancelled-notice">
+            <h3>⚠️ AUDIENCIA CANCELADA ⚠️</h3>
+            <p>La siguiente audiencia ha sido cancelada:</p>
+        </div>
+
+        <div class="info-box">
+            <h3>📋 Información de la Causa</h3>
+            <p><strong>Número:</strong> {{case_id}}</p>
+            <p><strong>Tipo:</strong> {{case_type}}</p>
+            <p><strong>Materia:</strong> {{case_matter}}</p>
+        </div>
+
+        <div class="info-box">
+            <h3>📅 Detalles de la Audiencia Cancelada</h3>
+            <p><strong>Tipo:</strong> {{hearing_type}}</p>
+            <p><strong>Fecha:</strong> {{hearing_date}}</p>
+            <p><strong>Hora:</strong> {{hearing_time}}</p>
+        </div>
+
+        <div class="info-box">
+            <h3>👥 Participantes Notificados</h3>
+            {% for participant in participants %}
+            <div class="participant">
+                <strong>{{participant.name}}</strong> ({{participant.role}})
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="next-steps">
+            <h3>📝 Próximos Pasos</h3>
+            <ul>
+                <li>El evento ha sido eliminado de su calendario</li>
+                <li>Se notificará oportunamente la nueva fecha de audiencia</li>
+                <li>Los documentos y preparativos realizados serán válidos para la nueva fecha</li>
+            </ul>
+        </div>
+
+        <div class="info-box">
+            <h3>ℹ️ Información Adicional</h3>
+            <p>Si tiene consultas sobre esta cancelación o requiere información adicional, por favor contacte a la secretaría del tribunal.</p>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Este es un mensaje automático del Sistema Judicial. Por favor no responda a este correo.</p>
+        <p>Si tiene alguna duda, contacte a la secretaría del tribunal.</p>
+        <p><small>Disculpe las molestias ocasionadas.</small></p>
+    </div>
+</body>
+</html>
