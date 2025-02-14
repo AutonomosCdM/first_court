@@ -1,42 +1,46 @@
 #!/bin/bash
 
+# Setup script for Open Canvas integration
+
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}Setting up Open Canvas integration...${NC}"
+echo -e "${BLUE}Setting up Open Canvas...${NC}"
 
-# 1. Clone Open Canvas if not exists
-if [ ! -d "open-canvas" ]; then
-    echo -e "${BLUE}Cloning Open Canvas...${NC}"
-    git clone https://github.com/langchain-ai/open-canvas.git
-    cd open-canvas
-    yarn install
-else
-    echo -e "${GREEN}Open Canvas already exists${NC}"
-    cd open-canvas
-    yarn install
+# 1. Update submodule
+echo "Updating Open Canvas submodule..."
+git submodule update --init --recursive vendor/open-canvas
+
+# 2. Install dependencies
+echo "Installing dependencies..."
+cd vendor/open-canvas
+yarn install
+
+# 3. Build Open Canvas
+echo "Building Open Canvas..."
+yarn build
+
+# 4. Link custom extensions
+echo "Linking custom extensions..."
+cd ../../
+ln -sf $(pwd)/custom/agents vendor/open-canvas/apps/agents/src/custom
+ln -sf $(pwd)/custom/integrations vendor/open-canvas/apps/agents/src/integrations
+ln -sf $(pwd)/custom/extensions vendor/open-canvas/apps/agents/src/extensions
+
+# 5. Setup environment
+echo "Setting up environment..."
+cp vendor/open-canvas/apps/agents/.env.example vendor/open-canvas/apps/agents/.env
+cp vendor/open-canvas/apps/web/.env.example vendor/open-canvas/apps/web/.env
+
+# 6. Configure API keys
+echo "Configuring API keys..."
+if [ -f ".env" ]; then
+    source .env
+    sed -i '' "s/DEEPSEEK_API_KEY=.*/DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY/" vendor/open-canvas/apps/agents/.env
+    sed -i '' "s/LANGSMITH_API_KEY=.*/LANGSMITH_API_KEY=$LANGSMITH_API_KEY/" vendor/open-canvas/apps/agents/.env
 fi
 
-# 2. Copy environment files
-echo -e "${BLUE}Setting up environment files...${NC}"
-cp apps/web/.env.example apps/web/.env
-cp apps/agents/.env.example apps/agents/.env
-
-# 3. Create our custom directories
-echo -e "${BLUE}Creating custom directories...${NC}"
-cd ..
-mkdir -p src/canvas/{adapters,actions}
-
-# 4. Install dependencies
-echo -e "${BLUE}Installing dependencies...${NC}"
-yarn add @supabase/supabase-js
-yarn add @langchain/core
-yarn add @langchain/openai
-
-echo -e "${GREEN}Setup complete!${NC}"
-echo -e "Next steps:"
-echo -e "1. Configure Supabase in apps/web/.env"
-echo -e "2. Configure DeepSeek models in apps/agents/.env"
-echo -e "3. Run yarn dev in open-canvas/apps/web"
+echo -e "${GREEN}Open Canvas setup complete!${NC}"
+echo "You can now start the development server with: cd vendor/open-canvas && yarn dev"
