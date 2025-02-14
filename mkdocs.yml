@@ -1,0 +1,63 @@
+site_name: Portal Judicial
+site_url: https://autonomoscdm.github.io/first_court
+repo_url: https://github.com/autonomoscdm/first_court
+repo_name: AutonomosCdM/first_court
+
+theme:
+  name: material
+  language: es
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Cambiar a modo oscuro
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Cambiar a modo claro
+
+plugins:
+  - search
+  - tags
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Inicio: index.md
+  - Trámites:
+    - tramites/index.md
+    - Ingreso de Causas: tramites/ingreso-causas.md
+    - Consulta de Estado: tramites/consulta-estado.md
+    - Presentación de Escritos: tramites/presentacion-escritos.md
+  - Audiencias:
+    - audiencias/index.md
+    - Calendario: audiencias/calendario.md
+    - Protocolo Virtual: audiencias/protocolo-virtual.md
+  - Centro de Ayuda:
+    - ayuda/index.md
+    - Preguntas Frecuentes: ayuda/faq.md
+    - Guías de Usuario: ayuda/guias.md
+    - Soporte Técnico: ayuda/soporte.md
