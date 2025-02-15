@@ -1,4 +1,0 @@
-[submodule "vendor/open-canvas"]
-	path = vendor/open-canvas
-	url = https://github.com/langchain-ai/open-canvas.git
-	branch = main
