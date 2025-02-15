@@ -1,0 +1,63 @@
+name: First Court CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        
+    - name: Install dependencies
+      run: poetry install
+        
+    - name: Setup Google Credentials
+      run: |
+        mkdir -p tests/credentials
+        echo "$GOOGLE_CREDENTIALS" > tests/credentials/test_google_credentials.json
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.TEST_GOOGLE_CREDENTIALS }}
+
+    - name: Run tests
+      run: poetry run pytest
+      env:
+        TEST_DRIVE_ROOT_FOLDER: ${{ secrets.TEST_DRIVE_ROOT_FOLDER }}
+        TEST_GOOGLE_TOKEN: ${{ secrets.TEST_GOOGLE_TOKEN }}
+        
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        
+    - name: Install dependencies
+      run: poetry install
+        
+    - name: Run linting
+      run: |
+        poetry run black . --check
+        poetry run flake8 .
+        poetry run mypy .

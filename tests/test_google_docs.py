@@ -2,13 +2,62 @@
 Pruebas unitarias para la integración con Google Docs
 """
 import unittest
+from unittest.mock import MagicMock, patch
 from src.integrations.google_docs import GoogleDocsClient
 from datetime import datetime
 
 class TestGoogleDocs(unittest.TestCase):
     def setUp(self):
         """Inicializar el cliente y datos de prueba"""
-        self.client = GoogleDocsClient()
+        # Mock Drive service
+        self.mock_drive_service = MagicMock()
+        self.mock_drive_service.files = MagicMock()
+        
+        # Mock file creation response
+        create_response = {
+            'id': 'test_doc_id',
+            'name': 'Test Document',
+            'webViewLink': 'https://docs.google.com/document/d/test'
+        }
+        create_request = MagicMock()
+        create_request.execute.return_value = create_response
+        self.mock_drive_service.files.create.return_value = create_request
+        
+        # Mock file copy response
+        copy_response = {
+            'id': 'test_copy_id',
+            'name': 'Test Copy',
+            'webViewLink': 'https://docs.google.com/document/d/copy'
+        }
+        copy_request = MagicMock()
+        copy_request.execute.return_value = copy_response
+        self.mock_drive_service.files.copy.return_value = copy_request
+        
+        # Mock template response
+        template_response = {
+            'id': 'test_template_id',
+            'name': 'Test Template',
+            'mimeType': 'application/vnd.google-apps.document',
+            'webViewLink': 'https://docs.google.com/document/d/template'
+        }
+        get_request = MagicMock()
+        get_request.execute.return_value = template_response
+        self.mock_drive_service.files.get.return_value = get_request
+        
+        # Mock Docs service
+        self.mock_docs_service = MagicMock()
+        
+        # Create client with mocked services
+        with patch('googleapiclient.discovery.build') as mock_build:
+            def mock_build_service(service, version, credentials):
+                if service == 'drive':
+                    return self.mock_drive_service
+                elif service == 'docs':
+                    return self.mock_docs_service
+            mock_build.side_effect = mock_build_service
+            
+            self.client = GoogleDocsClient()
+        
         self.test_metadata = {
             'case_id': 'TEST-2025-003',
             'type': 'Acta',
@@ -27,13 +76,23 @@ class TestGoogleDocs(unittest.TestCase):
         
     def test_create_from_template(self):
         """Prueba la creación de un documento desde template"""
-        from src.config.google_api_config import DOCS_CONFIG
+        template_id = 'test_template_id'
+        title = f"Template Test - {datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
+        # Create document from template
         doc = self.client.create_document(
-            title=f"Template Test - {datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            template_id=DOCS_CONFIG['templates']['acta'],
+            title=title,
+            template_id=template_id,
             metadata=self.test_metadata
         )
+        
+        # Verify API calls
+        self.mock_drive_service.files.get.assert_called_once_with(
+            fileId=template_id,
+            fields='id,name,mimeType,webViewLink'
+        )
+        
+        self.mock_drive_service.files.copy.assert_called_once()
         
         self.assertIn('id', doc)
         self.assertIn('webViewLink', doc)
@@ -47,10 +106,10 @@ class TestGoogleDocs(unittest.TestCase):
         )
         
         # Exportar a PDF
-        pdf = self.client.export_to_pdf(doc['id'])
+        pdf_bytes = self.client.export_to_pdf(doc['id'])
         
-        self.assertIn('id', pdf)
-        self.assertIn('webViewLink', pdf)
+        self.assertIsInstance(pdf_bytes, bytes)
+        self.assertTrue(len(pdf_bytes) > 0)
         
     def test_document_link(self):
         """Prueba la creación de enlaces entre documentos"""
@@ -71,8 +130,8 @@ class TestGoogleDocs(unittest.TestCase):
             source_doc_id=doc1['id']
         )
         
-        self.assertEqual(link['documentId'], doc2['id'])
-        self.assertEqual(link['sourceDocumentId'], doc1['id'])
+        self.assertIsInstance(link, str)
+        self.assertTrue(link.startswith('https://docs.google.com/document/d/'))
         
     def tearDown(self):
         """Limpiar recursos después de las pruebas"""

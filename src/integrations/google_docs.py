@@ -1,219 +1,235 @@
-"""
-Módulo de integración con Google Docs para la gestión de documentos judiciales.
-"""
-from typing import Dict, List, Optional, Union
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
-import os
-import pickle
+"""Google Docs integration module."""
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
-from pathlib import Path
 import json
-
-# Si modificas estos scopes, elimina el archivo token.pickle
-SCOPES = [
-    'https://www.googleapis.com/auth/drive',
-    'https://www.googleapis.com/auth/documents'
-]
+import io
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+from src.auth.auth_manager import AuthManager
+from src.utils.diff import calculate_diff, apply_patch
 
 class GoogleDocsClient:
-    """Cliente para interactuar con Google Docs"""
+    """Client for interacting with Google Docs API."""
     
-    def __init__(self):
-        """Inicializa el cliente de Google Docs"""
-        self.creds = None
-        self.docs_service = None
-        self.drive_service = None
-        self._authenticate()
-    
-    def _authenticate(self):
-        """Maneja el proceso de autenticación"""
-        if os.path.exists('token.pickle'):
-            with open('token.pickle', 'rb') as token:
-                self.creds = pickle.load(token)
-        
-        if not self.creds or not self.creds.valid:
-            if self.creds and self.creds.expired and self.creds.refresh_token:
-                self.creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials.json', SCOPES)
-                self.creds = flow.run_local_server(port=0)
-            
-            with open('token.pickle', 'wb') as token:
-                pickle.dump(self.creds, token)
-        
-        self.docs_service = build('docs', 'v1', credentials=self.creds)
-        self.drive_service = build('drive', 'v3', credentials=self.creds)
-    
-    def create_document(self, 
-                       title: str,
-                       template_id: str = None,
-                       folder_id: str = None,
-                       metadata: Dict = None) -> Dict:
-        """
-        Crea un nuevo documento en Google Docs
+    def __init__(self, auth_manager=None):
+        """Initialize the Google Docs client.
         
         Args:
-            title: Título del documento
-            template_id: ID del template a usar (opcional)
-            folder_id: ID de la carpeta donde crear el documento
-            metadata: Metadata adicional del documento
+            auth_manager: Optional AuthManager instance. If not provided,
+                         a new one will be created.
+        """
+        self.auth_manager = auth_manager or AuthManager()
+        self.service = None
+        self.drive_service = None
+        self._init_service()
+    
+    def _init_service(self):
+        """Initialize the Docs and Drive services."""
+        credentials = self.auth_manager.get_credentials()
+        self.service = build('docs', 'v1', credentials=credentials)
+        self.drive_service = build('drive', 'v3', credentials=credentials)
+    
+    def create_document(self, title: str, metadata: Optional[Dict[str, Any]] = None,
+                       template_id: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new Google Doc, optionally from a template.
+        
+        Args:
+            title: Title of the document
+            metadata: Optional metadata to add to the document
+            template_id: Optional template document ID to copy from
             
         Returns:
-            Dict con la información del documento creado
+            Dict containing document information including id, name, and webViewLink
         """
-        # Crear documento base
-        doc_metadata = {
-            'title': title,
-            'mimeType': 'application/vnd.google-apps.document'
-        }
-        
-        if folder_id:
-            doc_metadata['parents'] = [folder_id]
-        
-        doc = self.drive_service.files().create(
-            body=doc_metadata,
-            fields='id, webViewLink'
-        ).execute()
-        
-        # Si hay template, copiar su contenido
         if template_id:
-            template = self.docs_service.documents().get(
-                documentId=template_id
+            # Copiar desde plantilla
+            file_metadata = {
+                'name': title,
+                'mimeType': 'application/vnd.google-apps.document'
+            }
+            doc = self.drive_service.files().copy(
+                fileId=template_id,
+                body=file_metadata,
+                fields='id,name,mimeType,webViewLink'
             ).execute()
-            
-            # Copiar contenido del template
-            requests = self._generate_template_copy_requests(template)
-            self.docs_service.documents().batchUpdate(
-                documentId=doc['id'],
-                body={'requests': requests}
+        else:
+            # Crear documento nuevo
+            doc_metadata = {
+                'name': title,
+                'mimeType': 'application/vnd.google-apps.document'
+            }
+            doc = self.drive_service.files().create(
+                body=doc_metadata,
+                fields='id,name,mimeType,webViewLink'
             ).execute()
         
-        # Agregar metadata como propiedades personalizadas
         if metadata:
+            # Actualizar metadatos
             self.drive_service.files().update(
                 fileId=doc['id'],
-                body={'properties': metadata}
+                body={'properties': metadata},
+                fields='id,name,mimeType,webViewLink'
             ).execute()
         
         return doc
     
-    def export_to_pdf(self, 
-                     doc_id: str,
-                     output_folder_id: str = None) -> Dict:
-        """
-        Exporta un documento de Google Docs a PDF
+    def get_document(self, document_id: str, include_content: bool = True) -> Dict[str, Any]:
+        """Get a Google Doc by ID with optional content.
         
         Args:
-            doc_id: ID del documento a exportar
-            output_folder_id: ID de la carpeta donde guardar el PDF
+            document_id: ID of the document
+            include_content: Whether to include document content
             
         Returns:
-            Dict con la información del PDF creado
+            Document metadata and optionally content
         """
-        # Obtener metadata del documento original
-        doc_metadata = self.drive_service.files().get(
-            fileId=doc_id,
-            fields='name, properties'
+        fields = 'documentId,title,revisionId'
+        if include_content:
+            fields += ',body'
+            
+        return self.service.documents().get(
+            documentId=document_id,
+            fields=fields
         ).execute()
-        
-        # Configurar metadata del PDF
-        pdf_metadata = {
-            'name': f"{doc_metadata['name']}.pdf",
-            'mimeType': 'application/pdf'
-        }
-        
-        if output_folder_id:
-            pdf_metadata['parents'] = [output_folder_id]
-        
-        # Exportar a PDF
-        pdf = self.drive_service.files().export(
-            fileId=doc_id,
-            mimeType='application/pdf'
-        ).execute()
-        
-        # Crear archivo PDF en Drive
-        pdf_file = self.drive_service.files().create(
-            body=pdf_metadata,
-            media_body=pdf,
-            fields='id, webViewLink'
-        ).execute()
-        
-        # Copiar propiedades personalizadas
-        if 'properties' in doc_metadata:
-            self.drive_service.files().update(
-                fileId=pdf_file['id'],
-                body={'properties': doc_metadata['properties']}
-            ).execute()
-        
-        return pdf_file
     
-    def create_document_link(self,
-                           doc_id: str,
-                           source_doc_id: str = None) -> Dict:
-        """
-        Crea un enlace entre documentos relacionados
+    def insert_text(self, document_id: str, text: str,
+                   index: int = 1) -> Dict[str, Any]:
+        """Insert text into a Google Doc at specified index."""
+        requests = [
+            {
+                'insertText': {
+                    'location': {
+                        'index': index
+                    },
+                    'text': text
+                }
+            }
+        ]
+        
+        result = self.service.documents().batchUpdate(
+            documentId=document_id,
+            body={'requests': requests}
+        ).execute()
+        
+        return result
+    
+    def get_document_version(self, document_id: str, revision_id: str) -> Dict[str, Any]:
+        """Get a specific version of a document.
         
         Args:
-            doc_id: ID del documento principal
-            source_doc_id: ID del documento fuente
+            document_id: ID of the document
+            revision_id: ID of the revision to retrieve
             
         Returns:
-            Dict con la información del enlace
+            Document content at specified revision
         """
-        if source_doc_id:
-            # Obtener metadata de ambos documentos
-            doc = self.drive_service.files().get(
-                fileId=doc_id,
-                fields='properties'
-            ).execute()
-            
-            source = self.drive_service.files().get(
-                fileId=source_doc_id,
-                fields='properties'
-            ).execute()
-            
-            # Actualizar propiedades para mantener referencias
-            doc_props = doc.get('properties', {})
-            doc_props['sourceDocumentId'] = source_doc_id
-            
-            source_props = source.get('properties', {})
-            source_props['derivedDocumentId'] = doc_id
-            
-            # Actualizar ambos documentos
-            self.drive_service.files().update(
-                fileId=doc_id,
-                body={'properties': doc_props}
-            ).execute()
-            
-            self.drive_service.files().update(
-                fileId=source_doc_id,
-                body={'properties': source_props}
-            ).execute()
-        
-        return {
-            'documentId': doc_id,
-            'sourceDocumentId': source_doc_id
-        }
+        return self.drive_service.revisions().get(
+            fileId=document_id,
+            revisionId=revision_id,
+            fields='id,modifiedTime,lastModifyingUser'
+        ).execute()
     
-    def _generate_template_copy_requests(self, template: Dict) -> List[Dict]:
-        """Genera las solicitudes para copiar un template"""
+    def list_document_versions(self, document_id: str) -> List[Dict[str, Any]]:
+        """List all versions of a document.
+        
+        Args:
+            document_id: ID of the document
+            
+        Returns:
+            List of document versions with metadata
+        """
+        return self.drive_service.revisions().list(
+            fileId=document_id,
+            fields='revisions(id,modifiedTime,lastModifyingUser)'
+        ).execute().get('revisions', [])
+    
+    def restore_document_version(self, document_id: str, revision_id: str) -> Dict[str, Any]:
+        """Restore a document to a previous version.
+        
+        Args:
+            document_id: ID of the document
+            revision_id: ID of the revision to restore
+            
+        Returns:
+            Updated document metadata
+        """
+        return self.drive_service.revisions().update(
+            fileId=document_id,
+            revisionId=revision_id,
+            body={'published': True}
+        ).execute()
+    
+    def get_document_changes(self, document_id: str, start_revision_id: str,
+                           end_revision_id: str) -> List[Dict[str, Any]]:
+        """Get changes between two document versions.
+        
+        Args:
+            document_id: ID of the document
+            start_revision_id: Starting revision ID
+            end_revision_id: Ending revision ID
+            
+        Returns:
+            List of changes between versions
+        """
+        start_content = self.get_document(document_id, revision_id=start_revision_id)
+        end_content = self.get_document(document_id, revision_id=end_revision_id)
+        
+        return calculate_diff(start_content, end_content)
+    
+    def replace_text(self, document_id: str,
+                    replacements: Dict[str, str]) -> Dict[str, Any]:
+        """Replace text in a Google Doc using a dictionary of replacements."""
         requests = []
+        for old_text, new_text in replacements.items():
+            requests.append({
+                'replaceAllText': {
+                    'containsText': {
+                        'text': old_text,
+                        'matchCase': True
+                    },
+                    'replaceText': new_text
+                }
+            })
+            
+        result = self.service.documents().batchUpdate(
+            documentId=document_id,
+            body={'requests': requests}
+        ).execute()
         
-        # Insertar contenido del template
-        if 'body' in template:
-            for element in template['body'].get('content', []):
-                if 'paragraph' in element:
-                    requests.append({
-                        'insertText': {
-                            'location': {
-                                'index': 1
-                            },
-                            'text': element['paragraph']['elements'][0]['textRun']['content']
-                        }
-                    })
+        return result
+    
+    def create_document_link(self, doc_id: str = None, source_doc_id: str = None) -> str:
+        """Get the web view link for a document.
         
-        return requests
+        Args:
+            doc_id: Document ID (deprecated, use source_doc_id instead)
+            source_doc_id: Document ID to get link for
+            
+        Returns:
+            Web view link for the document
+        """
+        file_id = source_doc_id or doc_id
+        if not file_id:
+            raise ValueError("Either doc_id or source_doc_id must be provided")
+            
+        file = self.drive_service.files().get(
+            fileId=file_id,
+            fields='webViewLink'
+        ).execute()
+        return file['webViewLink']
+    
+    def export_to_pdf(self, document_id: str) -> bytes:
+        """Export a Google Doc to PDF format."""
+        request = self.drive_service.files().export_media(
+            fileId=document_id,
+            mimeType='application/pdf'
+        )
+        
+        file = io.BytesIO()
+        downloader = MediaIoBaseDownload(file, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        
+        return file.getvalue()

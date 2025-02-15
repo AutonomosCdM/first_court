@@ -9,8 +9,17 @@ export enum AgentType {
 export interface BaseAgentConfig {
   type: AgentType;
   model: string;
+  apiConfig: {
+    key: string;
+    baseUrl: string;
+  };
   contextWindow: number;
   temperature: number;
+  features?: {
+    selfVerification?: boolean;
+    reflection?: boolean;
+    chainOfThought?: boolean;
+  };
 }
 
 // Interfaces para acciones

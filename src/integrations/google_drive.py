@@ -1,61 +1,83 @@
-"""
-Módulo de integración con Google Drive para la gestión documental del tribunal.
-"""
-from typing import Dict, List, Optional, Union
+"""Google Drive integration module."""
+from typing import List, Dict, Any, Optional, Callable
+import time
+import random
+from functools import wraps
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-import os
-import pickle
-from datetime import datetime
-from pathlib import Path
+from googleapiclient.errors import HttpError
+from src.auth.auth_manager import AuthManager
 
-# Si modificas estos scopes, elimina el archivo token.pickle
-SCOPES = [
-    'https://www.googleapis.com/auth/drive'
-]
+def retry_with_backoff(max_retries: int = 10, initial_delay: float = 2.0):
+    """Decorador para reintentar operaciones con backoff exponencial."""
+    def decorator(func: Callable):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            delay = initial_delay
+            last_exception = None
+            
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except HttpError as e:
+                    if e.resp.status == 403 and 'userRateLimitExceeded' in str(e):
+                        last_exception = e
+                        time.sleep(delay + random.uniform(0, 2))
+                        delay *= 2
+                    else:
+                        raise
+            
+            raise last_exception
+        return wrapper
+    return decorator
 
 class GoogleDriveClient:
-    """Cliente para interactuar con Google Drive API"""
+    """Client for interacting with Google Drive API."""
     
     def __init__(self):
-        """Inicializa el cliente de Google Drive"""
-        self.creds = None
+        self.auth_manager = AuthManager()
         self.service = None
-        self._authenticate()
+        self._init_service()
     
-    def _authenticate(self):
-        """Maneja el proceso de autenticación con Google Drive"""
-        if os.path.exists('token.pickle'):
-            with open('token.pickle', 'rb') as token:
-                self.creds = pickle.load(token)
-        
-        if not self.creds or not self.creds.valid:
-            if self.creds and self.creds.expired and self.creds.refresh_token:
-                self.creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials.json', SCOPES)
-                self.creds = flow.run_local_server(port=0)
-            
-            with open('token.pickle', 'wb') as token:
-                pickle.dump(self.creds, token)
-        
-        self.service = build('drive', 'v3', credentials=self.creds)
+    def _init_service(self):
+        """Initialize the Drive service."""
+        credentials = self.auth_manager.get_credentials()
+        self.service = build('drive', 'v3', credentials=credentials)
     
-    def create_folder(self, name: str, parent_id: str = None) -> Dict:
-        """
-        Crea una carpeta en Google Drive
-        
-        Args:
-            name: Nombre de la carpeta
-            parent_id: ID de la carpeta padre (opcional)
+    @retry_with_backoff()
+    def upload_file(self, file_path: str, folder_id: Optional[str] = None,
+                    share_with: Optional[List[str]] = None,
+                    title: Optional[str] = None) -> Dict[str, Any]:
+        """Upload a file to Google Drive."""
+        file_metadata = {'name': title if title else file_path.split('/')[-1]}
+        if folder_id:
+            file_metadata['parents'] = [folder_id]
             
-        Returns:
-            Dict con la información de la carpeta creada
-        """
+        media = MediaFileUpload(file_path)
+        file = self.service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, name, webViewLink'
+        ).execute()
+        
+        if share_with:
+            for email in share_with:
+                self.service.permissions().create(
+                    fileId=file['id'],
+                    body={
+                        'type': 'user',
+                        'role': 'reader',
+                        'emailAddress': email
+                    }
+                ).execute()
+        
+        return file
+    
+    @retry_with_backoff()
+    def create_folder(self, name: str, parent_id: Optional[str] = None,
+                      share_with: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Create a new folder in Google Drive."""
         file_metadata = {
             'name': name,
             'mimeType': 'application/vnd.google-apps.folder'
@@ -63,160 +85,160 @@ class GoogleDriveClient:
         
         if parent_id:
             file_metadata['parents'] = [parent_id]
-        
-        return self.service.files().create(
-            body=file_metadata,
-            fields='id, name, webViewLink'
-        ).execute()
-    
-    def create_case_structure(self, case_id: str, title: str) -> Dict:
-        """
-        Crea la estructura de carpetas para un nuevo caso
-        
-        Args:
-            case_id: ID del caso
-            title: Título del caso
             
-        Returns:
-            Dict con los IDs de las carpetas creadas
-        """
+        folder = self.service.files().create(
+            body=file_metadata,
+            fields='id, name'
+        ).execute()
+        
+        if share_with:
+            for email in share_with:
+                self.service.permissions().create(
+                    fileId=folder['id'],
+                    body={
+                        'type': 'user',
+                        'role': 'reader',
+                        'emailAddress': email
+                    }
+                ).execute()
+        
+        return folder
+    
+    @retry_with_backoff()
+    def create_case_structure(self, case_id: str, case_type: str = 'Civil',
+                            participants: Optional[List[Dict[str, str]]] = None,
+                            title: Optional[str] = None) -> Dict[str, Any]:
+        """Create folder structure for a new case."""
         # Crear carpeta principal del caso
-        case_folder = self.create_folder(f"Caso-{case_id} - {title}")
-        case_folder_id = case_folder['id']
+        folder_name = title if title else f"Caso {case_id} - {case_type}"
+        case_folder = self.create_folder(folder_name)
         
         # Crear estructura base
-        structure = {
-            'public': self.create_folder('1_Documentos_Públicos', case_folder_id),
-            'confidential': self.create_folder('2_Documentos_Confidenciales', case_folder_id),
-            'communications': self.create_folder('3_Comunicaciones', case_folder_id)
+        folder_structure = {
+            'case_folder': case_folder,
+            'subfolders': {}
         }
         
-        # Crear subcarpetas públicas
-        public_subfolders = ['Demanda', 'Contestaciones', 'Resoluciones', 'Audiencias']
-        for folder in public_subfolders:
-            structure[f'public_{folder.lower()}'] = self.create_folder(
-                folder, structure['public']['id']
-            )
+        # Emails de participantes para permisos
+        participant_emails = [p['email'] for p in (participants or [])]
         
-        # Crear subcarpetas confidenciales
-        confidential_subfolders = ['Juez', 'Defensor', 'Secretaría']
-        for folder in confidential_subfolders:
-            structure[f'confidential_{folder.lower()}'] = self.create_folder(
-                folder, structure['confidential']['id']
-            )
+        # Crear carpetas confidenciales por rol
+        if participants:
+            roles = {'juez', 'defensor', 'fiscal'}
+            for role in roles:
+                role_emails = [p['email'] for p in participants if p.get('rol', '').lower() == role]
+                if role_emails:
+                    folder_name = f"Confidencial {role.title()}"
+                    subfolder = self.create_folder(folder_name, case_folder['id'],
+                                                 share_with=role_emails)
+                    folder_structure[f'confidential_{role.lower()}'] = subfolder
         
-        # Crear subcarpetas de comunicaciones
-        communication_subfolders = ['Notificaciones', 'Correspondencia']
-        for folder in communication_subfolders:
-            structure[f'communications_{folder.lower()}'] = self.create_folder(
-                folder, structure['communications']['id']
-            )
+        # Crear carpetas estándar
+        standard_folders = [
+            "Documentos Principales",
+            "Pruebas",
+            "Audiencias",
+            "Resoluciones",
+            "Confidencial"
+        ]
         
-        return structure
+        for folder_name in standard_folders:
+            if folder_name == "Confidencial" and participants:
+                judge_emails = [p['email'] for p in participants if p.get('rol', '').lower() == 'juez']
+                subfolder = self.create_folder(folder_name, case_folder['id'],
+                                             share_with=judge_emails)
+            else:
+                subfolder = self.create_folder(folder_name, case_folder['id'],
+                                             share_with=participant_emails if folder_name != "Confidencial" else None)
+            folder_structure['subfolders'][folder_name] = subfolder
+        
+        # Crear carpetas adicionales
+        additional_folders = {
+            'public': ('Público', participant_emails),
+            'communications': ('Comunicaciones', participant_emails)
+        }
+        
+        for key, (name, emails) in additional_folders.items():
+            folder = self.create_folder(name, case_folder['id'], share_with=emails)
+            folder_structure[key] = folder
+        
+        return folder_structure
     
-    def upload_file(self, 
-                   file_path: Union[str, Path], 
-                   parent_id: str,
-                   mime_type: str = None) -> Dict:
-        """
-        Sube un archivo a Google Drive
+    def list_files(self, folder_id: Optional[str] = None,
+                  page_size: int = 10) -> List[Dict[str, Any]]:
+        """List files in a folder."""
+        query = f"'{folder_id}' in parents" if folder_id else None
         
-        Args:
-            file_path: Ruta al archivo local
-            parent_id: ID de la carpeta donde subir el archivo
-            mime_type: Tipo MIME del archivo (opcional)
-            
-        Returns:
-            Dict con la información del archivo subido
-        """
-        file_path = Path(file_path)
-        file_metadata = {
-            'name': file_path.name,
-            'parents': [parent_id]
-        }
-        
-        media = MediaFileUpload(
-            str(file_path),
-            mimetype=mime_type,
-            resumable=True
-        )
-        
-        return self.service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id, name, webViewLink'
+        results = self.service.files().list(
+            pageSize=page_size,
+            fields="files(id, name, mimeType, webViewLink)",
+            q=query
         ).execute()
-    
-    def set_permissions(self, 
-                       file_id: str, 
-                       email: str, 
-                       role: str = 'reader',
-                       notify: bool = True) -> Dict:
-        """
-        Establece permisos para un archivo o carpeta
         
-        Args:
-            file_id: ID del archivo o carpeta
-            email: Email del usuario
-            role: Rol (reader, commenter, writer, owner)
-            notify: Si enviar notificación por email
-            
-        Returns:
-            Dict con la información del permiso creado
-        """
+        return results.get('files', [])
+    
+    def set_permissions(self, file_id: str, email: str, role: str = 'reader') -> Dict[str, Any]:
+        """Set permissions for a file."""
         permission = {
             'type': 'user',
             'role': role,
             'emailAddress': email
         }
         
-        return self.service.permissions().create(
+        result = self.service.permissions().create(
             fileId=file_id,
             body=permission,
-            sendNotificationEmail=notify,
-            fields='id, emailAddress, role'
+            fields='id,emailAddress,role'
         ).execute()
+        
+        return result
     
-    def get_file_metadata(self, file_id: str) -> Dict:
-        """
-        Obtiene los metadatos de un archivo o carpeta
+    def search_files(self, query: str, parent_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Search for files in Google Drive.
         
         Args:
-            file_id: ID del archivo o carpeta
+            query: Query string using Drive search syntax
+                  https://developers.google.com/drive/api/v3/search-files
+            parent_id: Optional parent folder ID to search within
             
         Returns:
-            Dict con los metadatos del archivo
+            List of file metadata dictionaries
         """
-        return self.service.files().get(
+        q = query
+        if parent_id:
+            q = f"({q}) and '{parent_id}' in parents"
+            
+        results = self.service.files().list(
+            q=q,
+            spaces='drive',
+            fields="files(id, name, mimeType, webViewLink, properties)"
+        ).execute()
+        
+        return results.get('files', [])
+    
+    def move_file(self, file_id: str, new_parent_id: str) -> Dict[str, Any]:
+        """Move a file to a different folder.
+        
+        Args:
+            file_id: ID of the file to move
+            new_parent_id: ID of the destination folder
+            
+        Returns:
+            Updated file metadata
+        """
+        # Get current parents
+        file = self.service.files().get(
             fileId=file_id,
+            fields='parents'
+        ).execute()
+        
+        # Remove and add parents
+        previous_parents = ",".join(file.get('parents', []))
+        file = self.service.files().update(
+            fileId=file_id,
+            addParents=new_parent_id,
+            removeParents=previous_parents,
             fields='id, name, mimeType, webViewLink, parents'
         ).execute()
-    
-    def search_files(self, 
-                    query: str, 
-                    parent_id: str = None,
-                    file_type: str = None) -> List[Dict]:
-        """
-        Busca archivos en Google Drive
         
-        Args:
-            query: Consulta de búsqueda
-            parent_id: ID de la carpeta donde buscar
-            file_type: Tipo de archivo a buscar
-            
-        Returns:
-            Lista de archivos encontrados
-        """
-        q = [f"name contains '{query}'"]
-        
-        if parent_id:
-            q.append(f"'{parent_id}' in parents")
-        
-        if file_type:
-            q.append(f"mimeType = '{file_type}'")
-        
-        return self.service.files().list(
-            q=" and ".join(q),
-            spaces='drive',
-            fields='files(id, name, mimeType, webViewLink)'
-        ).execute().get('files', [])
+        return file

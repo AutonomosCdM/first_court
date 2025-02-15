@@ -18,9 +18,15 @@ def test_confidential_structure():
     case_id = f"TEST-CONF-{timestamp}"
     
     print(f"\n2. Creando caso de prueba {case_id}...")
+    participants = [
+        {'email': 'cesar@autonomos.dev', 'rol': 'juez'},
+        {'email': 'tamara@autonomos.dev', 'rol': 'defensor'},
+        {'email': 'francisco@autonomos.dev', 'rol': 'fiscal'}
+    ]
     case_structure = drive_client.create_case_structure(
         case_id=case_id,
-        title="Prueba de Documentos Confidenciales"
+        title="Prueba de Documentos Confidenciales",
+        participants=participants
     )
     
     # Guardar estructura para referencia
@@ -32,9 +38,9 @@ def test_confidential_structure():
     # Configurar permisos para el juez
     print("\nConfigurando permisos para el juez...")
     judge_permissions = [
-        (case_structure['confidential_juez']['id'], 'writer'),
-        (case_structure['public']['id'], 'writer'),
-        (case_structure['communications']['id'], 'writer')
+        (case_structure['subfolders']['Confidencial']['id'], 'writer'),
+        (case_structure['subfolders']['Documentos Principales']['id'], 'writer'),
+        (case_structure['subfolders']['Audiencias']['id'], 'writer')
     ]
     
     for folder_id, role in judge_permissions:
@@ -70,7 +76,7 @@ def test_confidential_structure():
     
     judge_doc = drive_client.upload_file(
         file_path=temp_judge_path,
-        parent_id=case_structure['confidential_juez']['id']
+        folder_id=case_structure['confidential_juez']['id']
     )
     print(f"Documento del juez: {judge_doc['webViewLink']}")
     
@@ -81,7 +87,7 @@ def test_confidential_structure():
     
     defender_doc = drive_client.upload_file(
         file_path=temp_defender_path,
-        parent_id=case_structure['confidential_defensor']['id']
+        folder_id=case_structure['confidential_defensor']['id']
     )
     print(f"Documento del defensor: {defender_doc['webViewLink']}")
     
@@ -92,7 +98,7 @@ def test_confidential_structure():
     
     public_doc = drive_client.upload_file(
         file_path=temp_public_path,
-        parent_id=case_structure['public']['id']
+        folder_id=case_structure['public']['id']
     )
     print(f"Documento público: {public_doc['webViewLink']}")
     

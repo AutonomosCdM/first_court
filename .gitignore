@@ -33,11 +33,14 @@ env/
 
 # Environment variables and credentials
 .env
+.env.*
 credentials.json
 token.json
+token.pickle
 
 # Logs
 *.log
+logs/
 
 # Database
 *.sqlite3
@@ -47,8 +50,44 @@ token.json
 .coverage
 htmlcov/
 
+# Test files
+tests/credentials/*
+tests/temp/*
+!tests/credentials/.gitkeep
+!tests/temp/.gitkeep
+
 # Cache
 .cache/
+.next/
+
+# Node.js
+node_modules/
+
+# macOS
+.DS_Store
+._.DS_Store
+**/.DS_Store
+**/._.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Test configuration
+drive_test_*.json
+last_event_id.txt
+
+# Build output
+out/
+.next/
+
+# Local development
+*.local
+
+# Debug
+debug/
+*.debug
 .pytest_cache/
 
 # macOS

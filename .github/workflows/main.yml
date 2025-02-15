@@ -1,0 +1,45 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+  GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+  GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+  GOOGLE_CALENDAR_ID: ${{ secrets.GOOGLE_CALENDAR_ID }}
+  GOOGLE_DRIVE_FOLDER: ${{ secrets.GOOGLE_DRIVE_FOLDER }}
+  DEEPSEEK_R1_API_KEY: ${{ secrets.DEEPSEEK_R1_API_KEY }}
+  DEEPSEEK_CODER_V2_API_KEY: ${{ secrets.DEEPSEEK_CODER_V2_API_KEY }}
+  DEEPSEEK_R1_DISTILL_API_KEY: ${{ secrets.DEEPSEEK_R1_DISTILL_API_KEY }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Build
+      run: npm run build
+      
+    - name: Deploy
+      if: github.ref == 'refs/heads/main'
+      # Aquí iría la configuración de despliegue específica

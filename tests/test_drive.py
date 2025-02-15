@@ -23,8 +23,10 @@ def test_drive_integration():
         json.dump(case_structure, f, indent=2)
     
     print("\nEstructura creada:")
-    for key, value in case_structure.items():
-        print(f"- {key}: {value['webViewLink']}")
+    print(f"- Carpeta principal: {case_structure['case_folder']['id']}")
+    print("\nSubcarpetas:")
+    for name, folder in case_structure['subfolders'].items():
+        print(f"- {name}: {folder['id']}")
     
     print("\n3. Creando archivo de prueba...")
     # Crear archivo temporal
@@ -32,10 +34,10 @@ def test_drive_integration():
         temp.write("Este es un archivo de prueba para Google Drive")
         temp_path = temp.name
     
-    # Subir archivo a la carpeta de documentos públicos
+    # Subir archivo a la carpeta de documentos principales
     uploaded_file = drive_client.upload_file(
         file_path=temp_path,
-        parent_id=case_structure['public']['id']
+        folder_id=case_structure['subfolders']['Documentos Principales']['id']
     )
     
     print(f"Archivo subido: {uploaded_file['webViewLink']}")
@@ -43,23 +45,22 @@ def test_drive_integration():
     print("\n4. Configurando permisos...")
     # Asignar permisos al juez
     permission = drive_client.set_permissions(
-        file_id=case_structure['public']['id'],
+        file_id=case_structure['subfolders']['Documentos Principales']['id'],
         email="cesar@autonomos.dev",
         role="writer"
     )
     
     print(f"Permiso asignado a: {permission['emailAddress']} con rol: {permission['role']}")
     
-    print("\n5. Buscando archivos...")
-    # Buscar el archivo subido
-    files = drive_client.search_files(
-        query="prueba",
-        parent_id=case_structure['public']['id']
+    print("\n5. Listando archivos...")
+    # Listar archivos en la carpeta principal
+    files = drive_client.list_files(
+        folder_id=case_structure['case_folder']['id']
     )
     
     print("Archivos encontrados:")
     for file in files:
-        print(f"- {file['name']}: {file['webViewLink']}")
+        print(f"- {file['name']}")
     
     # Limpiar archivo temporal
     Path(temp_path).unlink()

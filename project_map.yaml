@@ -1,0 +1,221 @@
+project:
+  name: First Court
+  description: Sistema de justicia automatizado con agentes de IA
+  version: 1.0.0
+
+core_components:
+  agents:
+    judge:
+      file: src/agents/judge.py
+      role: Evaluación y decisión de casos
+      responsibilities:
+        - Toma de decisiones judiciales
+        - Emisión de resoluciones
+        - Supervisión del proceso
+      key_methods:
+        - handle_decision
+        - evaluate_case
+        - issue_resolution
+
+    prosecutor:
+      file: src/agents/prosecutor.py
+      role: Representación del interés público
+      responsibilities:
+        - Presentación de cargos
+        - Solicitud de evidencia
+        - Peticiones al tribunal
+      key_methods:
+        - handle_request
+        - present_charges
+        - request_evidence
+
+    defender:
+      file: src/agents/defender.py
+      role: Defensa del acusado
+      responsibilities:
+        - Representación del acusado
+        - Presentación de mociones
+        - Análisis de evidencia
+      key_methods:
+        - handle_request
+        - present_defense
+        - analyze_evidence
+
+    secretary:
+      file: src/agents/secretary.py
+      role: Gestión administrativa
+      responsibilities:
+        - Coordinación de audiencias
+        - Gestión documental
+        - Comunicación entre partes
+      key_methods:
+        - schedule_hearing
+        - manage_documents
+        - coordinate_communication
+
+  messaging:
+    base: src/agents/core/messaging.py
+    components:
+      - MessageBroker
+      - MessageQueue
+      - Message
+    message_types:
+      - REQUEST
+      - RESPONSE
+      - NOTIFICATION
+      - UPDATE
+      - DECISION
+      - ERROR
+
+integrations:
+  google_workspace:
+    components:
+      calendar:
+        file: src/integrations/google_calendar.py
+        purpose: Gestión de audiencias y eventos
+
+      docs:
+        file: src/integrations/google_docs.py
+        purpose: Generación y gestión de documentos
+
+      drive:
+        file: src/integrations/google_drive.py
+        purpose: Almacenamiento de expedientes
+
+      gmail:
+        file: src/integrations/gmail.py
+        purpose: Comunicaciones oficiales
+
+      forms:
+        file: src/integrations/google_forms.py
+        purpose: Recopilación de información
+
+  database:
+    components:
+      models:
+        file: src/integrations/database/models.py
+      redis:
+        file: src/integrations/database/redis_client.py
+        purpose: Caché y mensajería
+      elasticsearch:
+        file: src/integrations/database/elasticsearch_client.py
+        purpose: Búsqueda y indexación
+
+  templates:
+    directory: src/integrations/templates
+    files:
+      - notificacion.html
+      - base.html
+      - hearing_scheduled.html
+      - hearing_cancelled.html
+      - hearing_rescheduled.html
+      - acta_audiencia.html
+      - resolucion.html
+
+llm:
+  providers:
+    deepseek:
+      files:
+        - src/llm/providers/deepseek.py
+        - src/llm/providers/deepseek_custom.py
+      purpose: Procesamiento de lenguaje natural
+
+rag:
+  components:
+    system:
+      file: src/rag/rag_system.py
+    processor:
+      file: src/rag/document_processor.py
+    retriever:
+      file: src/rag/retriever.py
+    embeddings:
+      file: src/rag/embeddings.py
+
+documentation:
+  architecture:
+    core:
+      file: docs/ARQUITECTURA_CORE.md
+      purpose: Documentación principal de arquitectura
+    rag:
+      file: docs/rag_architecture.md
+      purpose: Arquitectura del sistema RAG
+
+  workflows:
+    tramites:
+      - docs/tramites/presentacion-escritos.md
+      - docs/tramites/ingreso-causas.md
+      - docs/tramites/consulta-estado.md
+
+  improvements:
+    files:
+      - docs/MEJORAS_FUTURAS.md
+      - docs/mejoras_judge_agent.md
+      - docs/mejoras_interaccion_agentes.md
+      - docs/drive_improvements.md
+      - docs/gmail_improvements.md
+      - docs/calendar_improvements.md
+
+  setup:
+    files:
+      - docs/SETUP.md
+      - docs/google_integration.md
+
+  help:
+    directory: docs/ayuda
+    files:
+      - soporte.md
+      - faq.md
+      - guias.md
+
+testing:
+  unit_tests:
+    directory: tests
+    key_tests:
+      - test_calendar_manage.py
+      - test_drive.py
+      - test_gmail.py
+      - test_google_meet.py
+
+  integration_tests:
+    directory: tests/integrations
+    files:
+      - test_database.py
+      - test_elasticsearch.py
+      - test_google_workspace.py
+      - test_redis.py
+
+  agent_tests:
+    directory: scripts/tests
+    files:
+      - test_court_interaction.py
+      - test_secretary_agent.py
+      - test_prosecutor_agent.py
+      - test_judge_agent.py
+      - test_defender_agent.py
+      - test_full_court_simulation.py
+
+configuration:
+  files:
+    - config/judicial_settings.py
+    - src/config/google_api_config.py
+    - src/config/oauth_scopes.py
+    - src/config/template_ids.json
+
+dependencies:
+  python:
+    - requirements.txt
+    - pyproject.toml
+  node:
+    - package.json
+    - yarn.lock
+
+scripts:
+  setup:
+    - scripts/setup_google_apis.py
+    - scripts/create_drive_folder.py
+    - scripts/setup_canvas.sh
+    - scripts/setup_secrets.sh
+  utilities:
+    - scripts/create_templates.py
+    - scripts/test_rag.py
+    - scripts/verify_auth.py

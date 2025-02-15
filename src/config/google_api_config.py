@@ -48,12 +48,14 @@ DRIVE_CONFIG = {
     'backup_folder_name': 'Backups'
 }
 
+import os
+
 # Configuración de Docs
 DOCS_CONFIG = {
     'templates': {
-        'acta': '${TEMPLATE_ACTA_ID}',
-        'resolucion': '${TEMPLATE_RESOLUCION_ID}',
-        'notificacion': '${TEMPLATE_NOTIFICACION_ID}'
+        'acta': os.getenv('TEMPLATE_ACTA_ID', '1234567890'),  # ID de ejemplo para pruebas
+        'resolucion': os.getenv('TEMPLATE_RESOLUCION_ID', '0987654321'),  # ID de ejemplo para pruebas
+        'notificacion': os.getenv('TEMPLATE_NOTIFICACION_ID', '1122334455')  # ID de ejemplo para pruebas
     },
     'default_font': 'Arial',
     'default_font_size': 11
