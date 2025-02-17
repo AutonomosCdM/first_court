@@ -1,0 +1,21 @@
+{
+    "editor.fontFamily": "'Cascadia Code', monospace",
+    "editor.fontSize": 14,
+    "editor.lineHeight": 1.5,
+    "editor.fontLigatures": true,
+    "editor.fontWeight": "normal",
+    "editor.letterSpacing": 0.5,
+    "workbench.colorCustomizations": {
+        "editor.background": "#1E1E1E",
+        "editor.foreground": "#D4D4D4"
+    },
+    "[markdown]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.wordWrap": "on",
+        "editor.fontFamily": "'Cascadia Code', monospace"
+    },
+    "[yaml]": {
+        "editor.defaultFormatter": "redhat.vscode-yaml",
+        "editor.fontFamily": "'Cascadia Code', monospace"
+    }
+}

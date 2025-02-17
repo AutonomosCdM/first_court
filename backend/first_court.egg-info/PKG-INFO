@@ -1,0 +1,12 @@
+Metadata-Version: 2.2
+Name: first_court
+Version: 0.1.0
+Requires-Python: >=3.9
+Requires-Dist: fastapi>=0.109.0
+Requires-Dist: uvicorn>=0.27.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: supabase>=2.3.0
+Requires-Dist: pydantic>=2.5.0
+Requires-Dist: httpx>=0.26.0
+Dynamic: requires-dist
+Dynamic: requires-python

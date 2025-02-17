@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvas Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        #canvas-container {
+            width: 800px;
+            height: 600px;
+            border: 1px solid #ccc;
+            position: relative;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        .cursor {
+            width: 10px;
+            height: 10px;
+            background: red;
+            border-radius: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .cursor::after {
+            content: attr(data-user);
+            position: absolute;
+            left: 15px;
+            top: -5px;
+            white-space: nowrap;
+            font-family: Arial;
+            font-size: 12px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .node {
+            width: 120px;
+            height: 80px;
+            background: #fff;
+            border: 2px solid #4a90e2;
+            border-radius: 8px;
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: move;
+            user-select: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s;
+        }
+        .node:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .edge {
+            position: absolute;
+            height: 2px;
+            background: #4a90e2;
+            transform-origin: left center;
+            pointer-events: none;
+        }
+        .toolbar {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            margin-right: 10px;
+            border: none;
+            border-radius: 4px;
+            background: #4a90e2;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button onclick="addNode()">Agregar Nodo</button>
+        <button onclick="connectNodes()">Conectar Nodos</button>
+    </div>
+    <div id="canvas-container"></div>
+
+    <script>
+        // Crear token JWT (en producción esto vendría del backend)
+        const createToken = () => {
+            const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+            const payload = btoa(JSON.stringify({
+                exp: Math.floor(Date.now() / 1000) + 3600,
+                iat: Math.floor(Date.now() / 1000),
+                sub: 'user_' + Math.random().toString(36).substr(2, 9)
+            }));
+            const signature = btoa('dev-signature');
+            return `${header}.${payload}.${signature}`;
+        };
+
+        const container = document.getElementById('canvas-container');
+        const cursors = new Map();
+        const nodes = new Map();
+        const edges = new Map();
+        let selectedNode = null;
+        let nodeCounter = 0;
+        
+        // Conectar al WebSocket
+        const token = createToken();
+        const ws = new WebSocket(`ws://localhost:9000/ws/canvas/test_case?token=${token}`);
+
+        function addNode() {
+            const node = document.createElement('div');
+            node.className = 'node';
+            node.id = `node-${++nodeCounter}`;
+            node.textContent = `Nodo ${nodeCounter}`;
+            node.style.left = Math.random() * (container.offsetWidth - 120) + 'px';
+            node.style.top = Math.random() * (container.offsetHeight - 80) + 'px';
+            
+            // Hacer el nodo arrastrable
+            node.addEventListener('mousedown', startDragging);
+            node.addEventListener('click', selectNode);
+            
+            container.appendChild(node);
+            nodes.set(node.id, node);
+            
+            // Notificar por WebSocket
+            ws.send(JSON.stringify({
+                type: 'node_create',
+                data: {
+                    id: node.id,
+                    position: {
+                        x: parseInt(node.style.left),
+                        y: parseInt(node.style.top)
+                    }
+                }
+            }));
+        }
+
+        function startDragging(e) {
+            const node = e.target;
+            const startX = e.clientX - parseInt(node.style.left);
+            const startY = e.clientY - parseInt(node.style.top);
+            
+            function drag(e) {
+                node.style.left = (e.clientX - startX) + 'px';
+                node.style.top = (e.clientY - startY) + 'px';
+                updateEdges(node.id);
+                
+                // Notificar por WebSocket
+                ws.send(JSON.stringify({
+                    type: 'node_move',
+                    data: {
+                        id: node.id,
+                        position: {
+                            x: parseInt(node.style.left),
+                            y: parseInt(node.style.top)
+                        }
+                    }
+                }));
+            }
+            
+            function stopDragging() {
+                document.removeEventListener('mousemove', drag);
+                document.removeEventListener('mouseup', stopDragging);
+            }
+            
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDragging);
+            e.preventDefault();
+        }
+
+        function selectNode(e) {
+            if (selectedNode === e.target) {
+                selectedNode.style.border = '2px solid #4a90e2';
+                selectedNode = null;
+            } else {
+                if (selectedNode) {
+                    selectedNode.style.border = '2px solid #4a90e2';
+                }
+                selectedNode = e.target;
+                selectedNode.style.border = '2px solid #f5a623';
+            }
+            e.stopPropagation();
+        }
+
+        function connectNodes() {
+            if (!selectedNode) {
+                alert('Selecciona un nodo primero');
+                return;
+            }
+            
+            const otherNodes = Array.from(nodes.values())
+                .filter(node => node !== selectedNode);
+            
+            if (otherNodes.length === 0) {
+                alert('Agrega más nodos para conectar');
+                return;
+            }
+            
+            const targetNode = otherNodes[Math.floor(Math.random() * otherNodes.length)];
+            createEdge(selectedNode.id, targetNode.id);
+        }
+
+        function createEdge(sourceId, targetId) {
+            const edge = document.createElement('div');
+            edge.className = 'edge';
+            edge.id = `edge-${sourceId}-${targetId}`;
+            container.insertBefore(edge, container.firstChild);
+            edges.set(edge.id, { edge, sourceId, targetId });
+            updateEdge(edge, sourceId, targetId);
+            
+            // Notificar por WebSocket
+            ws.send(JSON.stringify({
+                type: 'edge_create',
+                data: {
+                    id: edge.id,
+                    sourceId,
+                    targetId
+                }
+            }));
+        }
+
+        function updateEdge(edge, sourceId, targetId) {
+            const sourceNode = nodes.get(sourceId);
+            const targetNode = nodes.get(targetId);
+            
+            const sourceX = parseInt(sourceNode.style.left) + sourceNode.offsetWidth/2;
+            const sourceY = parseInt(sourceNode.style.top) + sourceNode.offsetHeight/2;
+            const targetX = parseInt(targetNode.style.left) + targetNode.offsetWidth/2;
+            const targetY = parseInt(targetNode.style.top) + targetNode.offsetHeight/2;
+            
+            const length = Math.sqrt(Math.pow(targetX - sourceX, 2) + Math.pow(targetY - sourceY, 2));
+            const angle = Math.atan2(targetY - sourceY, targetX - sourceX) * 180 / Math.PI;
+            
+            edge.style.width = length + 'px';
+            edge.style.left = sourceX + 'px';
+            edge.style.top = sourceY + 'px';
+            edge.style.transform = `rotate(${angle}deg)`;
+        }
+
+        function updateEdges(nodeId) {
+            edges.forEach(({edge, sourceId, targetId}) => {
+                if (sourceId === nodeId || targetId === nodeId) {
+                    updateEdge(edge, sourceId, targetId);
+                }
+            });
+        }
+
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            
+            switch(message.type) {
+                case 'cursor_move':
+                    const { user_id, data: { x, y } } = message;
+                    let cursor = cursors.get(user_id);
+                    if (!cursor) {
+                        cursor = document.createElement('div');
+                        cursor.className = 'cursor';
+                        cursor.setAttribute('data-user', user_id);
+                        container.appendChild(cursor);
+                        cursors.set(user_id, cursor);
+                    }
+                    cursor.style.left = x + 'px';
+                    cursor.style.top = y + 'px';
+                    break;
+                    
+                case 'node_create':
+                    if (!nodes.has(message.data.id)) {
+                        const node = document.createElement('div');
+                        node.className = 'node';
+                        node.id = message.data.id;
+                        node.textContent = `Nodo ${message.data.id.split('-')[1]}`;
+                        node.style.left = message.data.position.x + 'px';
+                        node.style.top = message.data.position.y + 'px';
+                        node.addEventListener('mousedown', startDragging);
+                        node.addEventListener('click', selectNode);
+                        container.appendChild(node);
+                        nodes.set(node.id, node);
+                    }
+                    break;
+                    
+                case 'node_move':
+                    const node = nodes.get(message.data.id);
+                    if (node) {
+                        node.style.left = message.data.position.x + 'px';
+                        node.style.top = message.data.position.y + 'px';
+                        updateEdges(message.data.id);
+                    }
+                    break;
+                    
+                case 'edge_create':
+                    if (!edges.has(message.data.id)) {
+                        createEdge(message.data.sourceId, message.data.targetId);
+                    }
+                    break;
+            }
+        };
+
+        // Enviar posición del cursor
+        container.addEventListener('mousemove', (e) => {
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            ws.send(JSON.stringify({
+                type: 'cursor_move',
+                data: { x, y }
+            }));
+        });
+    </script>
+</body>
+</html>

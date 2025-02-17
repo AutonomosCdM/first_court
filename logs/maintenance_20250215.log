@@ -1,0 +1,11 @@
+2025-02-15 14:07:42,866 - Maintenance - INFO - Starting maintenance tasks
+2025-02-15 14:07:42,866 - Maintenance - INFO - Cleaning up logs older than 7 days
+2025-02-15 14:07:42,866 - Maintenance - INFO - Cleaning up temporary files
+2025-02-15 14:07:42,867 - Maintenance - INFO - Removed temporary directory: /Users/autonomos_dev/Projects/first_court/.pytest_cache
+2025-02-15 14:07:42,867 - Maintenance - INFO - Verifying dependencies
+2025-02-15 14:07:42,867 - Maintenance - INFO - Poetry lock file found
+2025-02-15 14:07:42,867 - Maintenance - INFO - Backing up configuration files
+2025-02-15 14:07:42,867 - Maintenance - INFO - Backed up pyproject.toml
+2025-02-15 14:07:42,867 - Maintenance - INFO - Backed up poetry.lock
+2025-02-15 14:07:42,868 - Maintenance - INFO - Backed up docker-compose.yml
+2025-02-15 14:07:42,868 - Maintenance - INFO - Maintenance tasks completed successfully
