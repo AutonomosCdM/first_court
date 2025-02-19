@@ -1,142 +1,223 @@
-"""
-Módulo para la integración con Gather.town
-"""
 import os
 import logging
-from typing import Dict, List, Optional
 import requests
-from dotenv import load_dotenv
+from typing import Dict, Any, Optional, List
+from urllib.parse import quote
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+class GatherIntegrationError(Exception):
+    """Custom exception for Gather API integration errors"""
+    pass
 
-# Cargar variables de entorno
-load_dotenv()
-GATHER_API_KEY = os.getenv("GATHER_API_KEY")
-GATHER_API_BASE = "https://api.gather.town/api/v2"
+class GatherIntegration:
+    """
+    Integration class for interacting with Gather.town HTTP API
 
-# Template IDs para diferentes tipos de salas
-TEMPLATES = {
-    "tribunal_base": "1DemolM3y2NJZ5Wo\\first_court",  # Template básico de sala
-    "audiencia": "1DemolM3y2NJZ5Wo\\first_court",     # Template para audiencias
-    "mediacion": "1DemolM3y2NJZ5Wo\\first_court"      # Template para mediación
-}
+    Attributes:
+        _api_key (str): API key for authentication
+        _base_url (str): Base URL for Gather API
+        _logger (logging.Logger): Logger for tracking API interactions
+    """
 
-class GatherCourtIntegration:
-    def __init__(self, api_key: Optional[str] = None):
-        """Inicializar la integración con Gather"""
-        self.api_key = api_key or GATHER_API_KEY
-        if not self.api_key:
-            raise ValueError("GATHER_API_KEY no está configurada")
-        
-        self.headers = {"apiKey": self.api_key}
-        self.space_id = "1DemolM3y2NJZ5Wo"  # ID del espacio first_court
-        self.space_name = "first_court"
-
-    def get_court_info(self) -> Dict:
+    def __init__(self, api_key: str):
         """
-        Obtener información sobre el espacio del tribunal
-        
-        Returns:
-            Dict con la información del espacio
-        """
-        try:
-            response = requests.get(
-                f"{GATHER_API_BASE}/spaces/{self.space_id}",
-                headers=self.headers
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"Error de Gather API: {response.status_code}")
-                logger.error(f"Respuesta: {response.text}")
-                
-            response.raise_for_status()
-            
-            space_data = response.json()
-            logger.info(f"Información del espacio obtenida: {self.space_name}")
-            return space_data
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error al obtener información del espacio en Gather: {e}")
-            raise
+        Initialize Gather integration with API key
 
-    def configure_court_layout(
-        self,
-        space_id: str,
-        map_id: str = "default",
-        layout_config: Optional[Dict] = None
-    ) -> Dict:
-        """
-        Configurar el layout de una sala de tribunal
-        
         Args:
-            space_id: ID del espacio
-            map_id: ID del mapa (default por defecto)
-            layout_config: Configuración personalizada del layout
-            
-        Returns:
-            Dict con la configuración actualizada del mapa
+            api_key (str): Gather API key for authentication
         """
+        self._api_key = api_key
+        self._base_url = "https://api.gather.town/api"
+        
+        # Configure logging
+        logging.basicConfig(
+            level=logging.INFO, 
+            format='%(asctime)s - Gather Integration - %(levelname)s: %(message)s'
+        )
+        self._logger = logging.getLogger(__name__)
+
+    def _make_request(
+        self, 
+        method: str, 
+        endpoint: str, 
+        params: Optional[Dict[str, Any]] = None, 
+        data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Make an authenticated request to Gather API
+
+        Args:
+            method (str): HTTP method (GET, POST, etc.)
+            endpoint (str): API endpoint
+            params (Optional[Dict]): URL parameters
+            data (Optional[Dict]): Request body data
+
+        Returns:
+            Dict[str, Any]: API response
+        """
+        url = f"{self._base_url}{endpoint}"
+        headers = {
+            "Content-Type": "application/json",
+            "apiKey": self._api_key
+        }
+
         try:
-            # Obtener mapa actual
-            response = requests.get(
-                f"{GATHER_API_BASE}/spaces/{space_id}/maps/{map_id}",
-                headers=self.headers
-            )
-            response.raise_for_status()
-            current_map = response.json()
-            
-            # Configuración por defecto del tribunal
-            default_layout = {
-                "areas": [
-                    {
-                        "name": "Sala Principal",
-                        "description": "Sala principal del tribunal",
-                        "x": 0, "y": 0, "width": 20, "height": 15
-                    },
-                    {
-                        "name": "Estrado del Juez",
-                        "description": "Área reservada para el juez",
-                        "x": 8, "y": 0, "width": 4, "height": 3
-                    },
-                    {
-                        "name": "Mesa Fiscal",
-                        "description": "Área para el fiscal",
-                        "x": 2, "y": 4, "width": 3, "height": 2
-                    },
-                    {
-                        "name": "Mesa Defensor",
-                        "description": "Área para el defensor",
-                        "x": 15, "y": 4, "width": 3, "height": 2
-                    },
-                    {
-                        "name": "Secretaría",
-                        "description": "Área de la secretaría del tribunal",
-                        "x": 8, "y": 12, "width": 4, "height": 3
-                    }
-                ]
-            }
-            
-            # Combinar con configuración personalizada si existe
-            layout = layout_config or default_layout
-            current_map.update(layout)
-            
-            # Actualizar mapa
-            response = requests.post(
-                f"{GATHER_API_BASE}/spaces/{space_id}/maps/{map_id}",
-                json=current_map,
-                headers=self.headers
+            response = requests.request(
+                method, 
+                url, 
+                headers=headers, 
+                params=params, 
+                json=data
             )
             response.raise_for_status()
             
-            logger.info(f"Layout actualizado para espacio: {space_id}")
-            return response.json()
-            
+            return response.json() if response.content else {}
+        
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error al configurar layout en Gather: {e}")
+            self._logger.error(f"API Request Error: {e}")
+            raise GatherIntegrationError(f"API Request Failed: {e}")
+
+    def create_space(
+        self, 
+        name: str, 
+        source_space: str, 
+        reason: Optional[str] = None
+    ) -> str:
+        """
+        Create a new Gather space by copying an existing space
+
+        Args:
+            name (str): Name of the new space
+            source_space (str): SpaceId of the template space to copy
+            reason (Optional[str]): Reason for space creation
+
+        Returns:
+            str: SpaceId of the newly created space
+        """
+        endpoint = "/v2/spaces"
+        payload = {
+            "name": name,
+            "sourceSpace": source_space
+        }
+        
+        if reason:
+            payload["reason"] = reason
+
+        try:
+            result = self._make_request("POST", endpoint, data=payload)
+            return result
+        except GatherIntegrationError as e:
+            self._logger.error(f"Space Creation Error: {e}")
             raise
 
-    def get_space_url(self, space_id: str) -> str:
-        """Obtener URL para acceder al espacio"""
-        return f"https://gather.town/app/{space_id}"
+    def get_map(self, space_id: str, map_id: str) -> Dict[str, Any]:
+        """
+        Retrieve map data for a specific space and map
+
+        Args:
+            space_id (str): ID of the space
+            map_id (str): ID of the map within the space
+
+        Returns:
+            Dict[str, Any]: Map data
+        """
+        # Replace forward slashes with backslashes for proper encoding
+        encoded_space_id = quote(space_id.replace('/', '\\'))
+        encoded_map_id = quote(map_id)
+        
+        endpoint = f"/v2/spaces/{encoded_space_id}/maps/{encoded_map_id}"
+
+        try:
+            return self._make_request("GET", endpoint)
+        except GatherIntegrationError as e:
+            self._logger.error(f"Map Retrieval Error: {e}")
+            raise
+
+    def set_map(
+        self, 
+        space_id: str, 
+        map_id: str, 
+        content: Dict[str, Any]
+    ) -> None:
+        """
+        Set map contents for a specific space and map
+
+        Args:
+            space_id (str): ID of the space
+            map_id (str): ID of the map within the space
+            content (Dict[str, Any]): Map content to set
+        """
+        # Replace forward slashes with backslashes for proper encoding
+        encoded_space_id = quote(space_id.replace('/', '\\'))
+        encoded_map_id = quote(map_id)
+        
+        endpoint = f"/v2/spaces/{encoded_space_id}/maps/{encoded_map_id}"
+
+        try:
+            self._make_request("POST", endpoint, data={"content": content})
+        except GatherIntegrationError as e:
+            self._logger.error(f"Map Update Error: {e}")
+            raise
+
+    def get_email_guestlist(self, space_id: str) -> Dict[str, Any]:
+        """
+        Retrieve email guestlist for a space
+
+        Args:
+            space_id (str): ID of the space
+
+        Returns:
+            Dict[str, Any]: Guestlist keyed by email addresses
+        """
+        endpoint = "/getEmailGuestlist"
+        params = {"spaceId": space_id}
+
+        try:
+            return self._make_request("GET", endpoint, params=params)
+        except GatherIntegrationError as e:
+            self._logger.error(f"Guestlist Retrieval Error: {e}")
+            raise
+
+    def set_email_guestlist(
+        self, 
+        space_id: str, 
+        guestlist: Dict[str, Dict[str, str]], 
+        overwrite: bool = False
+    ) -> None:
+        """
+        Set email guestlist for a space
+
+        Args:
+            space_id (str): ID of the space
+            guestlist (Dict[str, Dict]): Guestlist to set
+            overwrite (bool, optional): Whether to overwrite existing list. Defaults to False.
+        """
+        endpoint = "/setEmailGuestlist"
+        payload = {
+            "spaceId": space_id,
+            "guestlist": guestlist,
+            "overwrite": overwrite
+        }
+
+        try:
+            self._make_request("POST", endpoint, data=payload)
+        except GatherIntegrationError as e:
+            self._logger.error(f"Guestlist Update Error: {e}")
+            raise
+
+# Example usage
+if __name__ == "__main__":
+    # Replace with actual API key
+    API_KEY = os.getenv("GATHER_API_KEY", "your_api_key_here")
+    
+    try:
+        gather_integration = GatherIntegration(API_KEY)
+        
+        # Example: Create a new space
+        new_space_id = gather_integration.create_space(
+            name="Court Simulation Space", 
+            source_space="your_template_space_id"
+        )
+        print(f"Created new space: {new_space_id}")
+        
+    except GatherIntegrationError as e:
+        print(f"Integration Error: {e}")
