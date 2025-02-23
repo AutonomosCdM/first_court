@@ -1,52 +1,122 @@
-# Sistema de Simulación Judicial Chileno
+## First Court
 
-## Descripción
-Sistema de simulación judicial basado en agentes autónomos para el entrenamiento y práctica de procedimientos legales chilenos.
+Sistema modular para gestión de procesos judiciales con integración de agentes AI.
 
-## Estructura del Proyecto
-```
-.
-├── config/               # Configuración del sistema
-├── src/
-│   ├── agents/          # Agentes judiciales autónomos
-│   ├── data/            # Base de datos legal
-│   ├── llm/             # Integración con modelos de lenguaje
-│   ├── simulation/      # Motor de simulación
-│   └── utils/           # Utilidades
-└── tests/               # Pruebas unitarias e integración
-```
+### Prerequisites
 
-## Configuración del Entorno
-1. Instalar Poetry:
+#### Node.js Version Management
+
+This project requires Node.js 18.x. We recommend using `nvm` (Node Version Manager) to manage Node.js versions:
+
 ```bash
-curl -sSL https://install.python-poetry.org | python3 -
+# Install NVM (if not already installed)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+
+# Use the specified Node.js version
+nvm use
 ```
 
-2. Instalar dependencias:
+#### Development Setup
+
+1. Clone the repository
+2. Install dependencies
+
 ```bash
-poetry install
+npm install
 ```
 
-3. Configurar variables de entorno:
+### Firebase Deployment
+
+#### Preview Channels
+
+Create a new preview channel:
+
 ```bash
-cp .env.example .env
-# Editar .env con las credenciales necesarias
+npm run firebase:channels:create [channelName]
 ```
 
-## Uso
-```python
-from src.simulation.court import CourtSimulation
-from config.judicial_settings import JudicialSettings
+List active preview channels:
 
-# Inicializar simulación
-settings = JudicialSettings()
-simulation = CourtSimulation(settings)
-
-# Agregar agentes
-simulation.add_agent("juez", JudgeAgent(settings))
-simulation.add_agent("abogado", LawyerAgent(settings))
-
-# Ejecutar simulación
-case_data = {"tipo": "civil", "materia": "arrendamiento"}
-results = simulation.run_simulation(case_data)
+```bash
+npm run firebase:channels:list
 ```
+
+#### Deployment
+
+Deploy to production:
+
+```bash
+npm run deploy:prod
+```
+
+Deploy to staging:
+
+```bash
+npm run deploy:staging
+```
+
+### CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment. Workflows are configured for:
+
+- Firebase Hosting deployment
+- Firebase App Distribution
+- Build and test validation
+
+#### Required GitHub Secrets
+
+- `FIREBASE_TOKEN`: Firebase CLI authentication token
+- `FIREBASE_SERVICE_ACCOUNT`: Service account JSON for Firebase
+- `FIREBASE_APP_ID`: Firebase App ID for distribution
+
+### Troubleshooting
+
+#### Node.js Version Compatibility
+
+If you encounter version-related issues, ensure you're using Node.js 18.x:
+
+```bash
+node --version  # Should output v18.x.x
+npm --version   # Should output 9.x.x or 10.x.x
+```
+
+If needed, install the correct Node.js version:
+
+```bash
+nvm install 18
+nvm use 18
+```
+
+### Deployment and Testing Scripts
+
+#### GitHub Secrets Setup
+
+Configure GitHub Actions secrets for CI/CD:
+
+```bash
+./scripts/setup-github-secrets.sh
+```
+
+#### Firebase App Distribution
+
+Configure tester groups and add testers:
+
+```bash
+./scripts/configure-app-distribution.sh
+```
+
+#### Deployment Testing
+
+Run comprehensive deployment validation:
+
+```bash
+./scripts/test-deployment.sh
+```
+
+#### Build Size Monitoring
+
+Current build statistics:
+
+- CSS Bundle: 9.49 kB (gzipped: 2.56 kB)
+- JavaScript Bundle: 489.44 kB (gzipped: 128.40 kB)
+- Source Map: 2,235.03 kB
