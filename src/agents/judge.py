@@ -3,7 +3,7 @@ Implementación del Agente Juez para el sistema judicial
 """
 from typing import Dict, List, Optional
 from src.agents.core.base_agent import JudicialAgent
-from src.llm.providers.deepseek_custom import DeepseekClient
+from src.llm.providers.claude_custom import ClaudeClient
 from src.agents.core.messaging import MessageType, MessagePriority, Message
 import os
 from rich.console import Console
@@ -24,66 +24,79 @@ class JudgeAgent(JudicialAgent):
     """
     
     def __init__(self, name: str = "Juez"):
-        super().__init__(name, {"api_key": os.getenv("DEEPSEEK_API_KEY")})
-        self.llm = DeepseekClient(api_key=os.getenv("DEEPSEEK_API_KEY"))
+        super().__init__(name, {"api_key": os.getenv("ANTHROPIC_API_KEY")})
+        self.llm = ClaudeClient(api_key=os.getenv("ANTHROPIC_API_KEY"))
         self.case_history: List[Dict] = []
         
     def analyze_case(self, case_data: Dict) -> Dict:
         """
         Analiza un caso judicial y genera una evaluación inicial
         """
-        prompt = f"""
-        Como juez del sistema judicial chileno, analiza el siguiente caso y proporciona una evaluación inicial.
-        Debes responder SOLO con un objeto JSON válido que contenga los siguientes campos:
+        tipo_analisis = case_data.get("tipo_analisis", "general")
         
-        {{
-            "evaluacion_preliminar": "descripción detallada",
-            "puntos_clave": ["punto 1", "punto 2", ...],
-            "pasos_procesales": ["paso 1", "paso 2", ...],
-            "complejidades": ["complejidad 1", "complejidad 2", ...]
-        }}
-        
-        DATOS DEL CASO:
-        {json.dumps(case_data, indent=2, ensure_ascii=False)}
-        """
+        if tipo_analisis == "admisibilidad":
+            prompt = f"""
+            Como juez del sistema judicial chileno, analiza la admisibilidad de la siguiente querella.
+            Debes considerar:
+            1. La revisión formal del Secretario
+            2. El análisis de mérito del Fiscal
+            3. La revisión de garantías del Defensor
+            
+            Debes responder SOLO con un objeto JSON válido que contenga los siguientes campos:
+            
+            {{
+                "admisibilidad": {{
+                    "decision": "ADMISIBLE/INADMISIBLE",
+                    "fundamentos": ["fundamento 1", "fundamento 2", ...],
+                    "requisitos_cumplidos": ["requisito 1", "requisito 2", ...],
+                    "requisitos_faltantes": ["requisito 1", "requisito 2", ...],
+                    "observaciones": ["observacion 1", "observacion 2", ...]
+                }},
+                "instrucciones_fiscal": {{
+                    "diligencias_ordenadas": ["diligencia 1", "diligencia 2", ...],
+                    "plazos": ["plazo 1", "plazo 2", ...],
+                    "medidas_urgentes": ["medida 1", "medida 2", ...],
+                    "instrucciones_especificas": ["instruccion 1", "instruccion 2", ...]
+                }}
+            }}
+            
+            DATOS DEL CASO:
+            {json.dumps(case_data, indent=2, ensure_ascii=False)}
+            
+            IMPORTANTE: Tu respuesta debe ser un objeto JSON válido, sin ningún texto adicional antes o después.
+            """
+        else:
+            prompt = f"""
+            Como juez del sistema judicial chileno, analiza el siguiente caso y proporciona una evaluación inicial.
+            Debes responder SOLO con un objeto JSON válido que contenga los siguientes campos:
+            
+            {{
+                "evaluacion_preliminar": "descripción detallada",
+                "puntos_clave": ["punto 1", "punto 2", ...],
+                "pasos_procesales": ["paso 1", "paso 2", ...],
+                "complejidades": ["complejidad 1", "complejidad 2", ...]
+            }}
+            
+            DATOS DEL CASO:
+            {json.dumps(case_data, indent=2, ensure_ascii=False)}
+            
+            IMPORTANTE: Tu respuesta debe ser un objeto JSON válido, sin ningún texto adicional antes o después.
+            """
         
         try:
             response = self.llm.generate(prompt)
-            # Intentar extraer el JSON de la respuesta
-            try:
-                # Buscar el primer { y el último }
-                start = response.find('{')
-                end = response.rfind('}')
-                if start >= 0 and end >= 0:
-                    json_str = response[start:end+1]
-                    analysis = json.loads(json_str)
-                else:
-                    # Si no hay JSON, crear uno con la respuesta como texto
-                    analysis = {
-                        "evaluacion_preliminar": response,
-                        "puntos_clave": [],
-                        "pasos_procesales": [],
-                        "complejidades": []
-                    }
-                
-                self.case_history.append({
-                    "type": "case_analysis",
-                    "data": analysis
-                })
-                return analysis
-            except json.JSONDecodeError:
-                # Si falla el parsing, devolver un JSON con el texto completo
-                analysis = {
-                    "evaluacion_preliminar": response,
-                    "puntos_clave": [],
-                    "pasos_procesales": [],
-                    "complejidades": []
-                }
-                self.case_history.append({
-                    "type": "case_analysis",
-                    "data": analysis
-                })
-                return analysis
+            # Si la respuesta es un string, parsearlo como JSON
+            if isinstance(response, str):
+                analysis = json.loads(response)
+            else:
+                analysis = response
+
+            # Guardar en el historial
+            self.case_history.append({
+                "type": "case_analysis",
+                "data": analysis
+            })
+            return analysis
         except Exception as e:
             console.print(f"[red]Error al analizar el caso: {str(e)}[/red]")
             return {"error": str(e)}

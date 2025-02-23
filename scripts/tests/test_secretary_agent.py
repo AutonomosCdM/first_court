@@ -21,6 +21,19 @@ logging.basicConfig(
 log = logging.getLogger("rich")
 console = Console()
 
+def print_env_vars():
+    """Imprime todas las variables de entorno relacionadas con LLMs"""
+    llm_vars = [
+        "ANTHROPIC_API_KEY", 
+        "OPENAI_API_KEY", 
+        "DEEPSEEK_API_KEY", 
+        "LLM_PROVIDER"
+    ]
+    console.print("\n[bold yellow]Variables de Entorno LLM:[/bold yellow]")
+    for var in llm_vars:
+        value = os.getenv(var, "NO CONFIGURADA")
+        console.print(f"{var}: {value}")
+
 def test_case_status_review():
     """Prueba la revisión del estado de una causa"""
     test_case = {
@@ -202,11 +215,11 @@ def main():
     """Función principal de prueba"""
     console.print("\n📋 [bold blue]Iniciando pruebas del Agente Secretario[/bold blue]\n")
     
-    load_dotenv()
+    # Cargar variables de entorno
+    load_dotenv(override=True)
     
-    if not os.getenv("DEEPSEEK_API_KEY"):
-        log.error("DEEPSEEK_API_KEY no encontrada en variables de entorno")
-        return
+    # Imprimir variables de entorno
+    print_env_vars()
     
     # Ejecutar pruebas
     status_ok = test_case_status_review()

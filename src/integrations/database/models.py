@@ -3,7 +3,7 @@ Modelos de base de datos usando SQLAlchemy
 """
 from datetime import datetime
 from typing import List
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text, Enum
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text, Enum, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 import enum

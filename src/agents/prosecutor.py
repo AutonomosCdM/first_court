@@ -3,8 +3,8 @@ Implementación del Agente Fiscal para el sistema judicial
 """
 from typing import Dict, List, Optional
 from src.agents.core.base_agent import JudicialAgent
-from src.agents.core.messaging import Message
-from src.llm.providers.deepseek_custom import DeepseekClient
+from src.agents.core.messaging import Message, AgentCommunication
+from src.llm.providers.claude_custom import ClaudeClient
 import os
 from rich.console import Console
 from rich.panel import Panel
@@ -12,7 +12,7 @@ import json
 
 console = Console()
 
-class ProsecutorAgent(JudicialAgent):
+class ProsecutorAgent(JudicialAgent, AgentCommunication):
     """
     Agente que actúa como Fiscal en el sistema judicial.
     Responsable de:
@@ -23,13 +23,15 @@ class ProsecutorAgent(JudicialAgent):
     - Presentar pruebas y argumentos
     """
     
-    def __init__(self, name: str = "Fiscal"):
-        super().__init__(name, {"api_key": os.getenv("DEEPSEEK_API_KEY")})
-        self.llm = DeepseekClient(api_key=os.getenv("DEEPSEEK_API_KEY"))
+    def __init__(self, name: str = "Fiscal", broker=None):
+        JudicialAgent.__init__(self, name, {"api_key": os.getenv("ANTHROPIC_API_KEY")})
+        AgentCommunication.__init__(self, name, broker)
+        self.llm = ClaudeClient(api_key=os.getenv("ANTHROPIC_API_KEY"))
         
     def analyze_case(self, case_data: Dict) -> Dict:
         """Implementación del método abstracto de JudicialAgent"""
-        return self.investigate_case(case_data)
+        result = self.investigate_case(case_data)
+        return json.loads(result) if isinstance(result, str) else result
     
     def investigate_case(self, case_data: Dict) -> Dict:
         """

@@ -1,6 +1,6 @@
 """Test configuration module."""
 import pytest
-from api.config import Settings
+from ..config import Settings
 
 def test_settings_default_values():
     """Test default values for settings."""

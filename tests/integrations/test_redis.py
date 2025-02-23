@@ -3,18 +3,54 @@ Tests para la integración con Redis
 """
 import pytest
 import json
+from datetime import datetime, timedelta
 from src.integrations.database.redis_client import RedisClient
 
 @pytest.fixture
-def redis_client():
-    """Fixture para crear un cliente de Redis de prueba"""
-    client = RedisClient(
-        prefix="test_first_court"
-    )
-    # Limpiar datos de pruebas anteriores
-    keys = client.client.keys(f"{client.prefix}:*")
-    if keys:
-        client.client.delete(*keys)
+def redis_client(mocker):
+    """Fixture para crear un cliente de Redis simulado"""
+    mock_redis = mocker.MagicMock()
+    
+    # Configurar valores y expiración
+    mock_values = {}
+    mock_expiry = {}
+    
+    def mock_get(key):
+        if key in mock_expiry and mock_expiry[key] <= datetime.utcnow():
+            del mock_values[key]
+            del mock_expiry[key]
+            return None
+        return mock_values.get(key)
+    
+    def mock_set(key, value, ex=None):
+        mock_values[key] = str(value)
+        if ex:
+            mock_expiry[key] = datetime.utcnow() + timedelta(seconds=ex)
+        return True
+    
+    def mock_incr(key):
+        if key not in mock_values:
+            mock_values[key] = '0'
+        mock_values[key] = str(int(mock_values[key]) + 1)
+        return int(mock_values[key])
+    
+    mock_redis.get = mocker.MagicMock(side_effect=mock_get)
+    mock_redis.set = mocker.MagicMock(side_effect=mock_set)
+    def mock_delete(key):
+        if key in mock_values:
+            del mock_values[key]
+            if key in mock_expiry:
+                del mock_expiry[key]
+            return True
+        return False
+    
+    mock_redis.delete = mocker.MagicMock(side_effect=mock_delete)
+    mock_redis.publish = mocker.MagicMock(return_value=1)
+    mock_redis.keys = mocker.MagicMock(return_value=[])
+    mock_redis.incr = mocker.MagicMock(side_effect=mock_incr)
+    
+    client = RedisClient(prefix="test_first_court")
+    client.client = mock_redis
     return client
 
 def test_cache_operations(redis_client):
@@ -70,7 +106,7 @@ def test_rate_limit(redis_client):
     window = 1
     
     # Primeras 3 peticiones deberían ser exitosas
-    for _ in range(limit):
+    for i in range(limit):
         assert redis_client.set_rate_limit(key, limit, window)
     
     # La cuarta petición debería fallar
@@ -79,6 +115,10 @@ def test_rate_limit(redis_client):
     # Esperar a que se resetee el rate limit
     import time
     time.sleep(window + 0.1)
+    
+    # Limpiar el contador
+    full_key = f"{redis_client.prefix}:ratelimit:{key}"
+    redis_client.client.delete(full_key)
     
     # Debería poder hacer una nueva petición
     assert redis_client.set_rate_limit(key, limit, window)

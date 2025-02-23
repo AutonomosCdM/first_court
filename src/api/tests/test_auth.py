@@ -3,8 +3,8 @@ from fastapi import HTTPException
 from datetime import datetime, timedelta
 import jwt
 
-from api.middleware.auth import AuthHandler
-from api.config import get_settings
+from src.api.middleware.auth import AuthHandler
+from src.api.config import get_settings
 
 @pytest.fixture
 def test_user_id():

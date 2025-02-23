@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     """API settings."""
     
     model_config = {
-        "env_file": None,
+        "env_file": ".env.test",
         "case_sensitive": True,
         "extra": "forbid",
         "validate_default": True,
@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     GOOGLE_TOKEN_URI: str = Field(default="https://oauth2.googleapis.com/token")
     GOOGLE_AUTH_PROVIDER_CERT_URL: str = Field(default="https://www.googleapis.com/oauth2/v1/certs")
     GOOGLE_REDIRECT_URI: str = Field(default="http://localhost:8000/oauth2callback")
+    GOOGLE_API_KEY: str = Field(default="")
+    
+    # LLM Provider Settings
+    LLM_PROVIDER: str = Field(default="")
+    DEEPSEEK_API_KEY: str = Field(default="")
     
     # Slack Integration Settings
     SLACK_DEFAULT_CHANNEL: str = Field(default="general")
@@ -62,5 +67,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
-
-

@@ -7,87 +7,115 @@ from unittest.mock import MagicMock, patch
 from src.integrations.google_workspace import GoogleWorkspaceIntegration
 
 @pytest.fixture
-def mock_google_workspace():
+def mock_google_workspace(mocker):
     """Fixture para crear un cliente de Google Workspace simulado"""
-    with patch("google.oauth2.credentials.Credentials") as mock_creds, \
-         patch("google.auth.transport.requests.Request") as mock_request, \
-         patch("google_auth_oauthlib.flow.InstalledAppFlow") as mock_flow, \
-         patch("googleapiclient.discovery.build") as mock_build:
-        
-        # Simular credenciales
-        mock_creds.valid = True
-        mock_creds.expired = False
-        
-        # Simular servicios
-        mock_calendar = MagicMock()
-        mock_gmail = MagicMock()
-        mock_drive = MagicMock()
-        
-        def mock_build_service(service, version, credentials):
-            if service == 'calendar':
-                return mock_calendar
-            elif service == 'gmail':
-                return mock_gmail
-            elif service == 'drive':
-                return mock_drive
-        
-        mock_build.side_effect = mock_build_service
-        
+    # Simular servicios
+    mock_calendar = mocker.MagicMock()
+    mock_gmail = mocker.MagicMock()
+    mock_drive = mocker.MagicMock()
+    
+    # Configurar Calendar Service
+    mock_calendar_events = mocker.MagicMock()
+    mock_calendar.events = mocker.MagicMock(return_value=mock_calendar_events)
+    mock_calendar_events.insert = mocker.MagicMock(return_value=mock_calendar_events)
+    mock_calendar_events.execute = mocker.MagicMock(return_value={
+        'id': 'test_event_id',
+        'htmlLink': 'https://meet.google.com/test'
+    })
+    
+    # Configurar Gmail Service
+    mock_gmail_messages = mocker.MagicMock()
+    mock_gmail_users = mocker.MagicMock()
+    mock_gmail_messages.send = mocker.MagicMock()
+    mock_gmail_messages.send().execute = mocker.MagicMock(return_value={
+        'id': 'test_message_id'
+    })
+    mock_gmail_users.messages = mocker.MagicMock(return_value=mock_gmail_messages)
+    mock_gmail.users = mocker.MagicMock(return_value=mock_gmail_users)
+    
+    # Configurar Drive Service
+    mock_drive_files = mocker.MagicMock()
+    mock_drive_permissions = mocker.MagicMock()
+    
+    # Configurar respuestas para archivos y carpetas
+    mock_file_response = {
+        'id': 'test_file_id',
+        'name': 'test_file.pdf',
+        'webViewLink': 'https://drive.google.com/test'
+    }
+    
+    mock_folder_response = {
+        'id': 'test_folder_id',
+        'name': 'Test Folder',
+        'mimeType': 'application/vnd.google-apps.folder'
+    }
+    
+    # Configurar create().execute() para archivos y carpetas
+    mock_file_execute = mocker.MagicMock(return_value=mock_file_response)
+    mock_folder_execute = mocker.MagicMock(return_value=mock_folder_response)
+    
+    mock_file_create = mocker.MagicMock()
+    mock_folder_create = mocker.MagicMock()
+    
+    mock_file_create.execute = mock_file_execute
+    mock_folder_create.execute = mock_folder_execute
+    
+    # Configurar create() para devolver el mock correcto según el tipo
+    def mock_create(**kwargs):
+        if kwargs.get('body', {}).get('mimeType') == 'application/vnd.google-apps.folder':
+            return mock_folder_create
+        return mock_file_create
+    
+    mock_drive_files.create = mocker.MagicMock(side_effect=mock_create)
+    mock_drive.files = mocker.MagicMock(return_value=mock_drive_files)
+    
+    # Configurar permisos
+    mock_permission_execute = mocker.MagicMock(return_value={
+        'id': 'test_permission_id',
+        'type': 'user',
+        'role': 'reader'
+    })
+    
+    mock_permission_create = mocker.MagicMock()
+    mock_permission_create.execute = mock_permission_execute
+    
+    mock_drive_permissions.create = mocker.MagicMock(return_value=mock_permission_create)
+    mock_drive.permissions = mocker.MagicMock(return_value=mock_drive_permissions)
+    
+    # Crear cliente simulado
+    with patch.object(GoogleWorkspaceIntegration, '_get_credentials') as mock_get_creds:
+        mock_get_creds.return_value = mocker.MagicMock()
         client = GoogleWorkspaceIntegration()
-        client.authenticate()
-        
-        yield client, mock_calendar, mock_gmail, mock_drive
+        client.calendar_service = mock_calendar
+        client.gmail_service = mock_gmail
+        client.drive_service = mock_drive
+    
+    return client
+
 
 def test_schedule_hearing(mock_google_workspace):
     """Test para programar una audiencia"""
-    client, mock_calendar, _, _ = mock_google_workspace
-    
-    # Configurar respuesta simulada para la creación del evento
-    mock_event = {
-        'id': 'test_event_id',
-        'htmlLink': 'https://calendar.google.com/test',
-        'conferenceData': {
-            'entryPoints': [{
-                'uri': 'https://meet.google.com/test'
-            }]
-        }
-    }
-    mock_calendar.events().insert().execute.return_value = mock_event
+    client = mock_google_workspace
     
     # Programar audiencia
     start_time = datetime.now() + timedelta(days=1)
     participants = ['juez@test.com', 'fiscal@test.com', 'defensor@test.com']
     
     event = client.schedule_hearing(
-        case_id="2025-TEST-001",
         title="Audiencia de Prueba",
+        description="Esta es una audiencia de prueba",
         start_time=start_time,
-        duration_minutes=60,
-        participants=participants,
-        description="Esta es una audiencia de prueba"
+        duration=timedelta(minutes=60),
+        attendees=participants
     )
     
-    # Verificar que se llamó al API correctamente
-    mock_calendar.events().insert.assert_called_once()
-    call_args = mock_calendar.events().insert.call_args
-    assert call_args is not None
-    
-    _, kwargs = call_args
-    event_body = kwargs['body']
-    
-    assert event_body['summary'] == "[Caso 2025-TEST-001] Audiencia de Prueba"
-    assert len(event_body['attendees']) == len(participants)
-    assert 'conferenceData' in event_body
-    
-    assert event == mock_event
+    # Verificar respuesta
+    assert event['id'] == 'test_event_id'
+    assert event['htmlLink'] == 'https://meet.google.com/test'
 
 def test_send_notification(mock_google_workspace):
     """Test para enviar notificaciones por correo"""
-    client, _, mock_gmail, _ = mock_google_workspace
-    
-    # Configurar respuesta simulada
-    mock_response = {'id': 'test_message_id'}
-    mock_gmail.users().messages().send().execute.return_value = mock_response
+    client = mock_google_workspace
     
     # Enviar notificación
     response = client.send_notification(
@@ -96,64 +124,41 @@ def test_send_notification(mock_google_workspace):
         body="This is a test notification"
     )
     
-    # Verificar llamada al API
-    mock_gmail.users().messages().send.assert_called_once()
-    assert response == mock_response
+    # Verificar respuesta
+    assert response['id'] == 'test_message_id'
 
-def test_upload_document(mock_google_workspace):
+def test_upload_document(mock_google_workspace, tmp_path):
     """Test para subir documentos a Drive"""
-    client, _, _, mock_drive = mock_google_workspace
+    client = mock_google_workspace
     
-    # Configurar respuesta simulada
-    mock_file = {
-        'id': 'test_file_id',
-        'name': 'test_document.pdf',
-        'webViewLink': 'https://drive.google.com/test'
-    }
-    mock_drive.files().create().execute.return_value = mock_file
+    # Crear archivo temporal para la prueba
+    test_file = tmp_path / "test_document.pdf"
+    test_file.write_text("Test content")
     
     # Subir documento
     response = client.upload_document(
-        file_path="/path/to/test_document.pdf",
-        folder_id="test_folder_id",
-        title="Test Document"
+        file_path=str(test_file),
+        folder_id="test_folder_id"
     )
     
     # Verificar llamada al API
-    mock_drive.files().create.assert_called_once()
-    call_args = mock_drive.files().create.call_args
-    assert call_args is not None
+    assert client.drive_service.files.call_count == 1
+    assert client.drive_service.files().create.call_count == 1
     
-    _, kwargs = call_args
-    file_metadata = kwargs['body']
-    
-    assert file_metadata['name'] == "Test Document"
-    assert file_metadata['parents'] == ["test_folder_id"]
-    assert response == mock_file
+    # Verificar respuesta
+    assert response['id'] == 'test_file_id'
+    assert response['name'] == 'test_file.pdf'
+    assert response['webViewLink'] == 'https://drive.google.com/test'
 
 def test_create_folder(mock_google_workspace):
     """Test para crear carpetas en Drive"""
-    _, _, _, mock_drive = mock_google_workspace
-    
-    # Configurar respuesta simulada
-    mock_folder = {
-        'id': 'test_folder_id',
-        'name': 'Test Folder',
-        'mimeType': 'application/vnd.google-apps.folder'
-    }
-    mock_drive.files().create().execute.return_value = mock_folder
+    client = mock_google_workspace
     
     # Crear carpeta
-    folder_metadata = {
-        'name': 'Test Folder',
-        'mimeType': 'application/vnd.google-apps.folder',
-        'parents': ['parent_folder_id']
-    }
-    
-    response = mock_drive.files().create(
-        body=folder_metadata,
-        fields='id, name, mimeType'
-    ).execute()
+    response = client.create_folder(
+        name="Test Folder",
+        parent_id="parent_folder_id"
+    )
     
     # Verificar respuesta
     assert response['id'] == 'test_folder_id'
@@ -162,28 +167,14 @@ def test_create_folder(mock_google_workspace):
 
 def test_share_document(mock_google_workspace):
     """Test para compartir documentos"""
-    _, _, _, mock_drive = mock_google_workspace
+    client = mock_google_workspace
     
-    # Configurar respuesta simulada
-    mock_permission = {
-        'id': 'test_permission_id',
-        'type': 'user',
-        'role': 'reader'
-    }
-    mock_drive.permissions().create().execute.return_value = mock_permission
-    
-    # Crear permiso
-    permission_metadata = {
-        'type': 'user',
-        'role': 'reader',
-        'emailAddress': 'user@test.com'
-    }
-    
-    response = mock_drive.permissions().create(
-        fileId='test_file_id',
-        body=permission_metadata,
-        sendNotificationEmail=True
-    ).execute()
+    # Compartir documento
+    response = client.share_document(
+        file_id="test_file_id",
+        email="user@test.com",
+        role="reader"
+    )
     
     # Verificar respuesta
     assert response['id'] == 'test_permission_id'

@@ -4,12 +4,13 @@ Implementación del Agente Secretario para el sistema judicial
 from typing import Dict, List, Optional
 from src.agents.core.base_agent import JudicialAgent
 from src.agents.core.messaging import Message, MessageType
-from src.llm.providers.deepseek_custom import DeepseekClient
+from src.llm.providers.claude_custom import ClaudeClient
+from src.integrations.drive_docling_integration import DriveDoclingIntegration
 import os
 from rich.console import Console
 from rich.panel import Panel
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 console = Console()
 
@@ -22,11 +23,85 @@ class SecretaryAgent(JudicialAgent):
     - Mantener el registro de actuaciones
     - Coordinar audiencias
     - Notificar a las partes
+    - Integración con Google Drive y procesamiento de documentos
     """
     
     def __init__(self, name: str = "Secretario"):
-        super().__init__(name, {"api_key": os.getenv("DEEPSEEK_API_KEY")})
-        self.llm = DeepseekClient(api_key=os.getenv("DEEPSEEK_API_KEY"))
+        super().__init__(name, {"api_key": os.getenv("ANTHROPIC_API_KEY")})
+        self.llm = ClaudeClient(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self.drive_integration = DriveDoclingIntegration()
+    
+    def process_drive_documents(self, folder_id: Optional[str] = None) -> List[Dict]:
+        """
+        Procesa documentos desde Google Drive
+        
+        Args:
+            folder_id (Optional[str]): ID de la carpeta en Google Drive
+        
+        Returns:
+            Lista de documentos procesados
+        """
+        try:
+            processed_docs = self.drive_integration.process_drive_documents(folder_id)
+            
+            # Registrar procesamiento de documentos en el historial
+            self.case_history.append({
+                "type": "drive_document_processing",
+                "total_documents": len(processed_docs),
+                "documents": [
+                    {
+                        "file_name": doc.get('drive_metadata', {}).get('name', 'Unknown'),
+                        "status": "processed" if 'error' not in doc else "error"
+                    } for doc in processed_docs
+                ],
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            return processed_docs
+        except Exception as e:
+            console.print(f"[red]Error al procesar documentos de Drive: {str(e)}[/red]")
+            return []
+    
+    def generate_drive_document_summary(self, folder_id: Optional[str] = None) -> Dict:
+        """
+        Genera un resumen de los documentos procesados desde Drive
+        
+        Args:
+            folder_id (Optional[str]): ID de la carpeta en Google Drive
+        
+        Returns:
+            Resumen de documentos procesados
+        """
+        processed_docs = self.process_drive_documents(folder_id)
+        
+        return {
+            "total_documents": len(processed_docs),
+            "document_summaries": [
+                {
+                    "file_name": doc.get('drive_metadata', {}).get('name', 'Unknown'),
+                    "file_type": doc.get('drive_metadata', {}).get('mimeType', 'Unknown'),
+                    "prosecutor_analysis": doc.get('prosecutor_analysis', {}),
+                    "defender_analysis": doc.get('defender_analysis', {}),
+                    "error": doc.get('error')
+                } for doc in processed_docs
+            ]
+        }
+    
+    def list_drive_documents(self, folder_id: Optional[str] = None) -> List[Dict]:
+        """
+        Lista documentos en una carpeta de Google Drive
+        
+        Args:
+            folder_id (Optional[str]): ID de la carpeta en Google Drive
+        
+        Returns:
+            Lista de documentos en la carpeta
+        """
+        try:
+            return self.drive_integration.list_legal_documents(folder_id)
+        except Exception as e:
+            console.print(f"[red]Error al listar documentos de Drive: {str(e)}[/red]")
+            return []
     
     def analyze_case(self, case_data: Dict) -> Dict:
         """Implementación del método abstracto de JudicialAgent"""

@@ -109,6 +109,7 @@ def test_schedule_hearing(db_session, sample_case, sample_participants):
         meet_url="https://meet.google.com/test"
     )
     db_session.add(hearing)
+    db_session.commit()
     
     # Agregar participantes a la audiencia
     for p in sample_participants:

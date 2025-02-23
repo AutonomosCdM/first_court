@@ -5,13 +5,17 @@ import asyncio
 from typing import Generator
 from unittest.mock import patch
 
-from api.config import Settings
-from api.middleware.auth import AuthHandler
+import os
+os.environ['ENV_FILE'] = '.env.test'
+
+from ..config import Settings
+from ..middleware.auth import AuthHandler
 
 @pytest.fixture(scope="session")
 def auth_handler(test_settings) -> AuthHandler:
     """Create auth handler with test settings and configure global instance."""
-    from api.middleware.auth import auth_handler as global_handler
+    from ..middleware.auth import get_auth_handler
+    global_handler = get_auth_handler()
     
     # Crear nueva instancia
     handler = AuthHandler.__new__(AuthHandler)
@@ -25,6 +29,9 @@ def auth_handler(test_settings) -> AuthHandler:
 
 @pytest.fixture(scope="session")
 def test_settings() -> Settings:
+    # Configurar variables de entorno para las pruebas
+    os.environ['DATABASE_POOL_SIZE'] = '5'
+    os.environ['REDIS_MAX_CONNECTIONS'] = '10'
     """Create test settings."""
     return Settings(
         DATABASE_POOL_SIZE=5,

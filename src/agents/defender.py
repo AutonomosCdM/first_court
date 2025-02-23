@@ -4,7 +4,7 @@ Implementación del Agente Defensor para el sistema judicial
 from typing import Dict, List, Optional
 from src.agents.core.base_agent import JudicialAgent
 from src.agents.core.messaging import Message
-from src.llm.providers.deepseek_custom import DeepseekClient
+from src.llm.providers.claude_custom import ClaudeClient
 import os
 from rich.console import Console
 from rich.panel import Panel
@@ -24,8 +24,8 @@ class DefenderAgent(JudicialAgent):
     """
     
     def __init__(self, name: str = "Defensor"):
-        super().__init__(name, {"api_key": os.getenv("DEEPSEEK_API_KEY")})
-        self.llm = DeepseekClient(api_key=os.getenv("DEEPSEEK_API_KEY"))
+        super().__init__(name, {"api_key": os.getenv("ANTHROPIC_API_KEY")})
+        self.llm = ClaudeClient(api_key=os.getenv("ANTHROPIC_API_KEY"))
     
     def analyze_case(self, case_data: Dict) -> Dict:
         """Implementación del método abstracto de JudicialAgent"""

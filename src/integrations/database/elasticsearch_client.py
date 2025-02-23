@@ -4,7 +4,7 @@ Cliente de Elasticsearch para búsqueda de documentos
 import logging
 from typing import Dict, List, Optional
 from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import ElasticsearchException
+from elasticsearch import ApiError as ElasticsearchException
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -112,7 +112,8 @@ class ElasticsearchClient:
         self,
         query: str,
         doc_type: str,
-        filters: Optional[Dict] = None
+        filters: Optional[Dict] = None,
+        highlight_fields: Optional[List[str]] = None
     ) -> Dict:
         """
         Buscar documentos
@@ -141,9 +142,7 @@ class ElasticsearchClient:
             },
             "highlight": {
                 "fields": {
-                    "title": {},
-                    "content": {},
-                    "description": {}
+                    field: {} for field in (highlight_fields or ["title", "content", "description"])
                 }
             }
         }

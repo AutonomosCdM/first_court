@@ -39,8 +39,9 @@ class AuthHandler:
         """Middleware para validar token en requests"""
         return self.decode_token(auth.credentials)
 
-# Crear instancia global del auth_handler
-auth_handler = AuthHandler()
+# Obtener instancia de AuthHandler
+def get_auth_handler():
+    return AuthHandler()
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
     """Dependency para obtener el usuario actual"""
