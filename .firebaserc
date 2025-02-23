@@ -1,0 +1,17 @@
+{
+  "projects": {
+    "default": "first-court"
+  },
+  "targets": {
+    "first-court": {
+      "hosting": {
+        "first-court-prod": [
+          "first-court-prod"
+        ],
+        "first-court-staging": [
+          "first-court-staging"
+        ]
+      }
+    }
+  }
+}

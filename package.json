@@ -1,0 +1,58 @@
+{
+  "name": "first-court",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Sistema modular para gestión de procesos judiciales con integración de agentes AI",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "jest",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "deploy": "firebase deploy --only hosting:first-court-prod",
+    "deploy:staging": "firebase hosting:channel:deploy preview",
+    "deploy:prod": "firebase deploy --only hosting:first-court-prod",
+    "testers:add": "firebase appdistribution:distribute",
+    "notes:gen": "node scripts/generate-release-notes.js",
+    "build:analyze": "vite build --mode analyze",
+    "preview:staging": "firebase hosting:channel:open preview",
+    "firebase:init": "./scripts/firebase-init.sh",
+    "firebase:channels:create": "firebase hosting:channel:create",
+    "firebase:channels:list": "firebase hosting:channels:list",
+    "testers:setup": "./scripts/setup-tester-environment.sh"
+  },
+  "dependencies": {
+    "@firebase/app-types": "^0.9.0",
+    "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
+    "commander": "^11.1.0",
+    "firebase": "^10.7.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.10",
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.39",
+    "@types/react-dom": "^18.2.17",
+    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/parser": "^6.13.1",
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.54.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.4",
+    "jest": "^29.7.0",
+    "postcss": "^8.4.31",
+    "prettier": "^3.1.0",
+    "rollup-plugin-visualizer": "^5.12.0",
+    "tailwindcss": "^3.3.5",
+    "typescript": "^5.3.2",
+    "vite": "^5.0.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,191 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10]
+        node-version: [18.x]
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    # Python setup
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        poetry install
+        
+    - name: Run Python tests
+      run: |
+        poetry run pytest
+      env:
+        ENVIRONMENT: testing
+        
+    # Node.js setup
+    - name: Set up Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install Node.js dependencies
+      run: npm ci
+        
+    - name: Run frontend tests
+      run: npm test
+        
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+        
+    - name: Install Python linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        poetry install
+        
+    - name: Run Python linters
+      run: |
+        poetry run black . --check
+        poetry run isort . --check-only
+        poetry run flake8 .
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install Node.js linting tools
+      run: npm ci
+        
+    - name: Run frontend linters
+      run: |
+        npm run lint
+        npm run format -- --check
+        
+  build-and-test-distribution:
+    needs: [test, lint]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Fetch all history for release notes
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+        
+    - name: Build application
+      run: npm run build
+      
+    - name: Generate release notes
+      run: npm run notes:gen -- -o release-notes.md
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist/
+        
+    - name: Upload release notes
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-notes
+        path: release-notes.md
+        
+  deploy-firebase:
+    needs: [build-and-test-distribution]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist
+        path: dist
+        
+    - name: Download release notes
+      uses: actions/download-artifact@v3
+      with:
+        name: release-notes
+        path: .
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        
+    - name: Install Firebase CLI
+      run: npm install -g firebase-tools
+      
+    - name: Deploy to Firebase App Distribution
+      run: |
+        npm ci
+        npm run deploy -- -g "internal-testers,beta-testers" -n release-notes.md
+      env:
+        FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        
+    - name: Tag release
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        git tag -a "v$VERSION" -m "Release v$VERSION"
+        git push origin "v$VERSION"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+  notify-testers:
+    needs: [deploy-firebase]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Send notification
+      uses: slackapi/slack-github-action@v1.24.0
+      with:
+        channel-id: 'testing-notifications'
+        slack-message: |
+          :rocket: New version deployed for testing!
+          
+          *Branch:* ${{ github.ref_name }}
+          *Commit:* ${{ github.sha }}
+          
+          Please check your email for Firebase App Distribution invitation.
+          Don't forget to submit feedback through the in-app form!
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
